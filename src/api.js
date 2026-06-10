@@ -1,14 +1,27 @@
 async function request(path, options = {}) {
-  const response = await fetch(path, {
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers
-    },
-    ...options
-  });
-  const body = await response.json().catch(() => ({}));
+  let response;
+
+  try {
+    response = await fetch(path, {
+      headers: {
+        "Content-Type": "application/json",
+        ...options.headers
+      },
+      ...options
+    });
+  } catch (error) {
+    throw createApiUnavailableError(error);
+  }
+
+  const contentType = response.headers.get("Content-Type") ?? "";
+  const isJson = contentType.includes("application/json");
+  const body = isJson ? await response.json().catch(() => ({})) : {};
 
   if (!response.ok) {
+    if (!isJson) {
+      throw createApiUnavailableError();
+    }
+
     const error = new Error(body.message ?? "요청을 처리하지 못했습니다.");
     error.code = body.code;
     error.status = response.status;
@@ -16,6 +29,14 @@ async function request(path, options = {}) {
   }
 
   return body;
+}
+
+function createApiUnavailableError(cause) {
+  const error = new Error("저장 서버에 연결할 수 없습니다.");
+  error.code = "API_UNAVAILABLE";
+  error.status = 0;
+  error.cause = cause;
+  return error;
 }
 
 export async function fetchReservations() {

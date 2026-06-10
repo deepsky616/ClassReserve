@@ -16,7 +16,8 @@ const messageByCode = {
   DUPLICATE_RESERVATION: "이미 같은 시간에 예약된 특별실입니다.",
   VALIDATION_ERROR: "입력한 내용을 다시 확인해 주세요.",
   INVALID_PASSWORD: "삭제 비밀번호가 맞지 않습니다.",
-  NOT_FOUND: "예약을 찾을 수 없습니다."
+  NOT_FOUND: "예약을 찾을 수 없습니다.",
+  API_UNAVAILABLE: "저장 서버에 연결할 수 없습니다. 노드 서버가 실행 중인 주소에서 다시 열어 주세요."
 };
 
 export default function App() {
@@ -49,7 +50,10 @@ export default function App() {
       setReservations(await fetchReservations());
       setMessage(null);
     } catch (error) {
-      setMessage({ type: "error", text: "예약 목록을 불러오지 못했습니다." });
+      setMessage({
+        type: "error",
+        text: messageByCode[error.code] ?? "예약 목록을 불러오지 못했습니다."
+      });
     } finally {
       setLoading(false);
     }
