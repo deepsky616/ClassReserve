@@ -50,16 +50,14 @@
 
 구글 앱스 스크립트 웹앱 주소 하나를 사용한다. 화면 앱은 이 주소로 요청한다.
 
-요청은 모두 `POST`로 보낸다. 브라우저와 구글 앱스 스크립트 배포 환경에서 단순하게 동작하도록 요청 본문에 `action` 값을 넣는다.
+요청은 모두 JSONP 방식의 `GET`으로 보낸다. 정적 웹앱에서 구글 앱스 스크립트 응답을 안정적으로 읽기 위해 `callback`과 `payload` 쿼리 값을 사용한다.
 
 ### 예약 목록 조회
 
 요청:
 
-```json
-{
-  "action": "list"
-}
+```txt
+?callback=콜백함수이름&payload={"action":"list"}
 ```
 
 응답:
@@ -75,18 +73,8 @@
 
 요청:
 
-```json
-{
-  "action": "create",
-  "reservation": {
-    "date": "2026-06-10",
-    "period": 1,
-    "room": "창의놀이실",
-    "grade": 1,
-    "classNumber": 1,
-    "password": "1234"
-  }
-}
+```txt
+?callback=콜백함수이름&payload={"action":"create","reservation":{"date":"2026-06-10","period":1,"room":"창의놀이실","grade":1,"classNumber":1,"password":"1234"}}
 ```
 
 처리:
@@ -100,12 +88,8 @@
 
 요청:
 
-```json
-{
-  "action": "delete",
-  "id": "예약 식별값",
-  "password": "1234"
-}
+```txt
+?callback=콜백함수이름&payload={"action":"delete","id":"예약 식별값","password":"1234"}
 ```
 
 처리:
