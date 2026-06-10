@@ -17,7 +17,9 @@ const messageByCode = {
   VALIDATION_ERROR: "입력한 내용을 다시 확인해 주세요.",
   INVALID_PASSWORD: "삭제 비밀번호가 맞지 않습니다.",
   NOT_FOUND: "예약을 찾을 수 없습니다.",
-  API_UNAVAILABLE: "저장 서버에 연결할 수 없습니다. 노드 서버가 실행 중인 주소에서 다시 열어 주세요."
+  CONFIG_MISSING: "구글 앱스 스크립트 주소가 설정되지 않았습니다.",
+  GOOGLE_SCRIPT_UNAVAILABLE: "구글 시트 저장소에 연결할 수 없습니다.",
+  GOOGLE_SCRIPT_ERROR: "구글 시트 저장소 요청을 처리하지 못했습니다."
 };
 
 export default function App() {

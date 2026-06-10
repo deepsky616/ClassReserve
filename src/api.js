@@ -1,60 +1,88 @@
-async function request(path, options = {}) {
-  let response;
+const DEFAULT_TIMEOUT_MS = 15000;
 
-  try {
-    response = await fetch(path, {
-      headers: {
-        "Content-Type": "application/json",
-        ...options.headers
-      },
-      ...options
-    });
-  } catch (error) {
-    throw createApiUnavailableError(error);
-  }
-
-  const contentType = response.headers.get("Content-Type") ?? "";
-  const isJson = contentType.includes("application/json");
-  const body = isJson ? await response.json().catch(() => ({})) : {};
-
-  if (!response.ok) {
-    if (!isJson) {
-      throw createApiUnavailableError();
-    }
-
-    const error = new Error(body.message ?? "요청을 처리하지 못했습니다.");
-    error.code = body.code;
-    error.status = response.status;
-    throw error;
-  }
-
-  return body;
+function getConfiguredScriptUrl(options = {}) {
+  return options.scriptUrl ?? import.meta.env?.VITE_GOOGLE_SCRIPT_URL ?? "";
 }
 
-function createApiUnavailableError(cause) {
-  const error = new Error("저장 서버에 연결할 수 없습니다.");
-  error.code = "API_UNAVAILABLE";
+function callGoogleScript(payload, options = {}) {
+  const scriptUrl = getConfiguredScriptUrl(options);
+
+  if (!scriptUrl) {
+    throw createClientError(
+      "구글 앱스 스크립트 주소가 설정되지 않았습니다.",
+      "CONFIG_MISSING"
+    );
+  }
+
+  return new Promise((resolve, reject) => {
+    const callbackName = `__classReserveCallback_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const url = new URL(scriptUrl);
+    url.searchParams.set("callback", callbackName);
+    url.searchParams.set("payload", JSON.stringify(payload));
+
+    const script = document.createElement("script");
+    const timeout = window.setTimeout(() => {
+      cleanup();
+      reject(createClientError("구글 앱스 스크립트 응답 시간이 초과되었습니다.", "GOOGLE_SCRIPT_UNAVAILABLE"));
+    }, options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+
+    window[callbackName] = (body) => {
+      cleanup();
+
+      if (!body?.ok) {
+        reject(createClientError(body?.message ?? "요청을 처리하지 못했습니다.", body?.code ?? "GOOGLE_SCRIPT_ERROR"));
+        return;
+      }
+
+      resolve(body);
+    };
+
+    script.onerror = () => {
+      cleanup();
+      reject(createClientError("구글 앱스 스크립트에 연결할 수 없습니다.", "GOOGLE_SCRIPT_UNAVAILABLE"));
+    };
+
+    script.src = url.toString();
+    document.body.appendChild(script);
+
+    function cleanup() {
+      window.clearTimeout(timeout);
+      delete window[callbackName];
+      script.remove?.();
+    }
+  });
+}
+
+function createClientError(message, code) {
+  const error = new Error(message);
+  error.code = code;
   error.status = 0;
-  error.cause = cause;
   return error;
 }
 
-export async function fetchReservations() {
-  const body = await request("/api/reservations");
+export async function fetchReservations(options) {
+  const body = await callGoogleScript({ action: "list" }, options);
   return body.reservations;
 }
 
-export async function createReservation(input) {
-  const body = await request("/api/reservations", {
-    method: "POST",
-    body: JSON.stringify(input)
-  });
+export async function createReservation(input, options) {
+  const body = await callGoogleScript(
+    {
+      action: "create",
+      reservation: input
+    },
+    options
+  );
   return body.reservation;
 }
 
-export async function deleteReservation(id, password) {
-  return request(`/api/reservations/${id}`, {
-    method: "DELETE",
-    body: JSON.stringify({ password })
-  });
+export async function deleteReservation(id, password, options) {
+  return callGoogleScript(
+    {
+      action: "delete",
+      id,
+      password
+    },
+    options
+  );
 }
