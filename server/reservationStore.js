@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { createPasswordHash, verifyPassword } from "./password.js";
 
 const REQUIRED_FIELDS = ["date", "period", "room", "grade", "classNumber", "password"];
+const ALLOWED_ROOMS = new Set(["창의놀이실", "청계누리(강당)", "컴퓨터실", "음악실", "다모임실"]);
 
 export function createReservationStore(options = {}) {
   const filePath = options.filePath ?? path.resolve("data/reservations.json");
@@ -111,6 +112,10 @@ function validateReservationInput(input) {
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date)) {
     throw createError("날짜 형식이 올바르지 않습니다.", "VALIDATION_ERROR", 400);
+  }
+
+  if (!ALLOWED_ROOMS.has(input.room)) {
+    throw createError("선택할 수 없는 특별실입니다.", "VALIDATION_ERROR", 400);
   }
 
   if (!isNumberInRange(input.period, 1, 6)) {
