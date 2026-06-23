@@ -1,6 +1,6 @@
 const SHEET_NAME = "reservations";
 const SPREADSHEET_ID_PROPERTY = "SPREADSHEET_ID";
-const ALLOWED_ROOMS = ["창의놀이실", "청계누리(강당)", "컴퓨터실", "음악실", "다모임실"];
+const ALLOWED_ROOMS = ["창의놀이실", "청계누리(강당)", "컴퓨터실(4층)", "AI실(2층)", "음악실", "다모임실"];
 const HEADER = ["id", "date", "period", "room", "grade", "classNumber", "passwordHash", "createdAt"];
 
 function doGet(e) {

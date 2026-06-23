@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { createPasswordHash, verifyPassword } from "./password.js";
 
 const REQUIRED_FIELDS = ["date", "period", "room", "grade", "classNumber", "password"];
-const ALLOWED_ROOMS = new Set(["창의놀이실", "청계누리(강당)", "컴퓨터실", "음악실", "다모임실"]);
+const ALLOWED_ROOMS = new Set(["창의놀이실", "청계누리(강당)", "컴퓨터실(4층)", "AI실(2층)", "음악실", "다모임실"]);
 
 export function createReservationStore(options = {}) {
   const filePath = options.filePath ?? path.resolve("data/reservations.json");

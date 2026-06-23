@@ -74,6 +74,32 @@ test("목록에 없는 특별실은 예약할 수 없다", async () => {
   });
 });
 
+test("새 특별실 목록의 컴퓨터실과 AI실을 예약할 수 있다", async () => {
+  await withStore(async (store) => {
+    const computerRoom = await store.createReservation({
+      ...validInput,
+      room: "컴퓨터실(4층)"
+    });
+    const aiRoom = await store.createReservation({
+      ...validInput,
+      date: "2026-06-16",
+      room: "AI실(2층)"
+    });
+
+    assert.equal(computerRoom.room, "컴퓨터실(4층)");
+    assert.equal(aiRoom.room, "AI실(2층)");
+  });
+});
+
+test("이전 이름인 컴퓨터실은 예약할 수 없다", async () => {
+  await withStore(async (store) => {
+    await assert.rejects(
+      () => store.createReservation({ ...validInput, room: "컴퓨터실" }),
+      { code: "VALIDATION_ERROR" }
+    );
+  });
+});
+
 test("올바른 삭제 비밀번호로 예약을 삭제한다", async () => {
   await withStore(async (store) => {
     const created = await store.createReservation(validInput);
