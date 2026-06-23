@@ -4,10 +4,11 @@ const ALLOWED_ROOMS = ["창의놀이실", "청계누리(강당)", "컴퓨터실"
 const HEADER = ["id", "date", "period", "room", "grade", "classNumber", "passwordHash", "createdAt"];
 
 function doGet(e) {
-  const callback = sanitizeCallback(e.parameter.callback);
+  const parameter = e && e.parameter ? e.parameter : {};
+  const callback = sanitizeCallback(parameter.callback);
 
   try {
-    const payload = parsePayload(e.parameter.payload);
+    const payload = parsePayload(parameter.payload);
     const result = handleAction(payload);
     return jsonp(callback, result);
   } catch (error) {
@@ -17,6 +18,10 @@ function doGet(e) {
       message: error.message || "요청을 처리하지 못했습니다."
     });
   }
+}
+
+function testListReservations() {
+  return handleAction({ action: "list" });
 }
 
 function handleAction(payload) {
