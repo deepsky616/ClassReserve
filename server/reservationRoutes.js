@@ -39,10 +39,16 @@ export function createReservationApp({ store }) {
       return;
     }
 
-    response.status(error.status ?? 500).json({
+    const body = {
       code: error.code ?? "SERVER_ERROR",
       message: error.message ?? "서버 오류가 발생했습니다."
-    });
+    };
+
+    if (error.conflictReservation) {
+      body.conflictReservation = error.conflictReservation;
+    }
+
+    response.status(error.status ?? 500).json(body);
   });
 
   return app;

@@ -1,6 +1,7 @@
 const SHEET_NAME = "reservations";
 const SPREADSHEET_ID_PROPERTY = "SPREADSHEET_ID";
 const ALLOWED_ROOMS = ["창의놀이실", "청계누리(강당)", "컴퓨터실(4층)", "AI실(2층)", "음악실", "다모임실"];
+const KINDERGARTEN_GRADE = "유치원";
 const HEADER = ["id", "date", "period", "room", "grade", "classNumber", "passwordHash", "createdAt"];
 
 function doGet(e) {
@@ -69,7 +70,7 @@ function createReservation(input) {
   try {
     const sheet = getReservationSheet();
     const rows = readRows(sheet);
-    const duplicate = rows.some(function (reservation) {
+    const duplicate = rows.find(function (reservation) {
       return (
         reservation.date === input.date &&
         Number(reservation.period) === Number(input.period) &&
@@ -78,7 +79,7 @@ function createReservation(input) {
     });
 
     if (duplicate) {
-      throw createError("이미 예약된 특별실입니다.", "DUPLICATE_RESERVATION");
+      throw createError("이미 " + formatReservationOwner(duplicate) + "이 예약한 특별실입니다.", "DUPLICATE_RESERVATION");
     }
 
     const reservation = {
@@ -86,7 +87,7 @@ function createReservation(input) {
       date: input.date,
       period: Number(input.period),
       room: input.room,
-      grade: Number(input.grade),
+      grade: normalizeGrade(input.grade),
       classNumber: Number(input.classNumber),
       passwordHash: hashPassword(input.password),
       createdAt: new Date().toISOString()
@@ -184,7 +185,7 @@ function rowToReservation(row) {
     date: String(row[1]),
     period: Number(row[2]),
     room: String(row[3]),
-    grade: Number(row[4]),
+    grade: normalizeGrade(row[4]),
     classNumber: Number(row[5]),
     passwordHash: String(row[6]),
     createdAt: String(row[7])
@@ -197,7 +198,7 @@ function toPublicReservation(reservation) {
     date: reservation.date,
     period: Number(reservation.period),
     room: reservation.room,
-    grade: Number(reservation.grade),
+    grade: normalizeGrade(reservation.grade),
     classNumber: Number(reservation.classNumber),
     createdAt: reservation.createdAt
   };
@@ -229,8 +230,8 @@ function validateReservation(input) {
     throw createError("교시는 1교시부터 6교시까지 선택할 수 있습니다.", "VALIDATION_ERROR");
   }
 
-  if (!isIntegerInRange(input.grade, 1, 6)) {
-    throw createError("학년은 1학년부터 6학년까지 선택할 수 있습니다.", "VALIDATION_ERROR");
+  if (!isValidGrade(input.grade)) {
+    throw createError("학년은 유치원 또는 1학년부터 6학년까지 선택할 수 있습니다.", "VALIDATION_ERROR");
   }
 
   if (!isIntegerInRange(input.classNumber, 1, 10)) {
@@ -241,6 +242,20 @@ function validateReservation(input) {
 function isIntegerInRange(value, min, max) {
   const number = Number(value);
   return Number.isInteger(number) && number >= min && number <= max;
+}
+
+function isValidGrade(value) {
+  return value === KINDERGARTEN_GRADE || isIntegerInRange(value, 1, 6);
+}
+
+function normalizeGrade(value) {
+  return value === KINDERGARTEN_GRADE ? KINDERGARTEN_GRADE : Number(value);
+}
+
+function formatReservationOwner(reservation) {
+  const grade = normalizeGrade(reservation.grade);
+  const gradeLabel = grade === KINDERGARTEN_GRADE ? KINDERGARTEN_GRADE : grade + "학년";
+  return gradeLabel + " " + Number(reservation.classNumber) + "반";
 }
 
 function hashPassword(password) {

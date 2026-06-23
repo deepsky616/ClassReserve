@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { createReservation, deleteReservation, fetchReservations } from "./api.js";
-import { CLASSES, GRADES, PERIODS, ROOMS, WEEKDAY_LABELS } from "./constants.js";
+import { CLASSES, GRADES, KINDERGARTEN_GRADE, PERIODS, ROOMS, WEEKDAY_LABELS } from "./constants.js";
 import { addWeeks, formatWeekRange, getStartOfWeek, getWeekDays, toDateKey } from "./dateUtils.js";
+import { formatReservationOwner } from "./reservationLabels.js";
 
 const initialForm = {
   date: toDateKey(new Date()),
@@ -21,6 +22,22 @@ const messageByCode = {
   GOOGLE_SCRIPT_UNAVAILABLE: "구글 시트 저장소에 연결할 수 없습니다.",
   GOOGLE_SCRIPT_ERROR: "구글 시트 저장소 요청을 처리하지 못했습니다."
 };
+
+function errorMessage(error, fallback) {
+  if (error.code === "DUPLICATE_RESERVATION" && error.message) {
+    return error.message;
+  }
+
+  return messageByCode[error.code] ?? error.message ?? fallback;
+}
+
+function normalizeGradeForSubmit(grade) {
+  return grade === KINDERGARTEN_GRADE ? KINDERGARTEN_GRADE : Number(grade);
+}
+
+function gradeLabel(grade) {
+  return grade === KINDERGARTEN_GRADE ? KINDERGARTEN_GRADE : `${grade}학년`;
+}
 
 export default function App() {
   const [reservations, setReservations] = useState([]);
@@ -54,7 +71,7 @@ export default function App() {
     } catch (error) {
       setMessage({
         type: "error",
-        text: messageByCode[error.code] ?? "예약 목록을 불러오지 못했습니다."
+        text: errorMessage(error, "예약 목록을 불러오지 못했습니다.")
       });
     } finally {
       setLoading(false);
@@ -78,7 +95,7 @@ export default function App() {
       const reservation = await createReservation({
         ...form,
         period: Number(form.period),
-        grade: Number(form.grade),
+        grade: normalizeGradeForSubmit(form.grade),
         classNumber: Number(form.classNumber),
         password: form.password.trim()
       });
@@ -88,7 +105,7 @@ export default function App() {
     } catch (error) {
       setMessage({
         type: "error",
-        text: messageByCode[error.code] ?? "예약을 저장하지 못했습니다."
+        text: errorMessage(error, "예약을 저장하지 못했습니다.")
       });
     } finally {
       setSaving(false);
@@ -96,7 +113,7 @@ export default function App() {
   }
 
   async function handleDelete(reservation) {
-    const password = window.prompt(`${reservation.room} ${reservation.grade}학년 ${reservation.classNumber}반 예약의 삭제 비밀번호를 입력해 주세요.`);
+    const password = window.prompt(`${reservation.room} ${formatReservationOwner(reservation)} 예약의 삭제 비밀번호를 입력해 주세요.`);
 
     if (!password) {
       return;
@@ -109,7 +126,7 @@ export default function App() {
     } catch (error) {
       setMessage({
         type: "error",
-        text: messageByCode[error.code] ?? "예약을 삭제하지 못했습니다."
+        text: errorMessage(error, "예약을 삭제하지 못했습니다.")
       });
     }
   }
@@ -194,9 +211,7 @@ export default function App() {
                                   <article className="reservation-item" key={reservation.id}>
                                     <div>
                                       <strong>{reservation.room}</strong>
-                                      <span>
-                                        {reservation.grade}학년 {reservation.classNumber}반
-                                      </span>
+                                      <span>{formatReservationOwner(reservation)}</span>
                                     </div>
                                     <button
                                       type="button"
@@ -268,7 +283,7 @@ export default function App() {
                   <select value={form.grade} onChange={(event) => updateForm("grade", event.target.value)}>
                     {GRADES.map((grade) => (
                       <option key={grade} value={grade}>
-                        {grade}학년
+                        {gradeLabel(grade)}
                       </option>
                     ))}
                   </select>

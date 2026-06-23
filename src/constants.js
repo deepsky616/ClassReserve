@@ -9,7 +9,9 @@ export const ROOMS = [
 
 export const PERIODS = [1, 2, 3, 4, 5, 6];
 
-export const GRADES = [1, 2, 3, 4, 5, 6];
+export const KINDERGARTEN_GRADE = "유치원";
+
+export const GRADES = [KINDERGARTEN_GRADE, 1, 2, 3, 4, 5, 6];
 
 export const CLASSES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 

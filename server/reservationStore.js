@@ -5,6 +5,7 @@ import { createPasswordHash, verifyPassword } from "./password.js";
 
 const REQUIRED_FIELDS = ["date", "period", "room", "grade", "classNumber", "password"];
 const ALLOWED_ROOMS = new Set(["창의놀이실", "청계누리(강당)", "컴퓨터실(4층)", "AI실(2층)", "음악실", "다모임실"]);
+const KINDERGARTEN_GRADE = "유치원";
 
 export function createReservationStore(options = {}) {
   const filePath = options.filePath ?? path.resolve("data/reservations.json");
@@ -40,7 +41,7 @@ export function createReservationStore(options = {}) {
   async function createReservation(input) {
     validateReservationInput(input);
     const reservations = await readReservations();
-    const duplicate = reservations.some((reservation) => {
+    const duplicate = reservations.find((reservation) => {
       return (
         reservation.date === input.date &&
         Number(reservation.period) === Number(input.period) &&
@@ -49,7 +50,12 @@ export function createReservationStore(options = {}) {
     });
 
     if (duplicate) {
-      throw createError("이미 예약된 특별실입니다.", "DUPLICATE_RESERVATION", 409);
+      throw createError(
+        `이미 ${formatReservationOwner(duplicate)}이 예약한 특별실입니다.`,
+        "DUPLICATE_RESERVATION",
+        409,
+        { conflictReservation: stripPrivateFields(duplicate) }
+      );
     }
 
     const reservation = {
@@ -57,7 +63,7 @@ export function createReservationStore(options = {}) {
       date: input.date,
       period: Number(input.period),
       room: input.room,
-      grade: Number(input.grade),
+      grade: normalizeGrade(input.grade),
       classNumber: Number(input.classNumber),
       passwordHash: createPasswordHash(input.password),
       createdAt: now()
@@ -94,10 +100,11 @@ export function createReservationStore(options = {}) {
   };
 }
 
-export function createError(message, code, status = 400) {
+export function createError(message, code, status = 400, details = {}) {
   const error = new Error(message);
   error.code = code;
   error.status = status;
+  Object.assign(error, details);
   return error;
 }
 
@@ -122,8 +129,8 @@ function validateReservationInput(input) {
     throw createError("교시는 1교시부터 6교시까지 선택할 수 있습니다.", "VALIDATION_ERROR", 400);
   }
 
-  if (!isNumberInRange(input.grade, 1, 6)) {
-    throw createError("학년은 1학년부터 6학년까지 선택할 수 있습니다.", "VALIDATION_ERROR", 400);
+  if (!isValidGrade(input.grade)) {
+    throw createError("학년은 유치원 또는 1학년부터 6학년까지 선택할 수 있습니다.", "VALIDATION_ERROR", 400);
   }
 
   if (!isNumberInRange(input.classNumber, 1, 10)) {
@@ -136,9 +143,28 @@ function isNumberInRange(value, min, max) {
   return Number.isInteger(number) && number >= min && number <= max;
 }
 
+function isValidGrade(value) {
+  return value === KINDERGARTEN_GRADE || isNumberInRange(value, 1, 6);
+}
+
+function normalizeGrade(value) {
+  return value === KINDERGARTEN_GRADE ? KINDERGARTEN_GRADE : Number(value);
+}
+
+function formatReservationOwner(reservation) {
+  const grade = normalizeGrade(reservation.grade);
+  const gradeLabel = grade === KINDERGARTEN_GRADE ? KINDERGARTEN_GRADE : `${grade}학년`;
+  return `${gradeLabel} ${Number(reservation.classNumber)}반`;
+}
+
 function stripPrivateFields(reservation) {
   const { passwordHash, ...publicReservation } = reservation;
-  return publicReservation;
+  return {
+    ...publicReservation,
+    period: Number(publicReservation.period),
+    grade: normalizeGrade(publicReservation.grade),
+    classNumber: Number(publicReservation.classNumber)
+  };
 }
 
 function withCode(error, code) {
