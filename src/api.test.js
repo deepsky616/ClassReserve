@@ -6,6 +6,7 @@ import {
   createReservationRangeAndConfirm,
   deleteReservation,
   deleteReservationAndConfirm,
+  deleteReservationsAndConfirm,
   fetchReservations
 } from "./api.js";
 
@@ -476,6 +477,91 @@ test("삭제 응답은 성공이지만 목록에 남아 있으면 삭제 확인 
   try {
     await assert.rejects(
       () => deleteReservationAndConfirm("reservation-2", "12", {
+        scriptUrl: "https://script.google.com/macros/s/example/exec"
+      }),
+      {
+        code: "DELETE_UNCONFIRMED",
+        message: "예약 삭제를 확인하지 못했습니다. 저장소 배포 상태를 확인해 주세요."
+      }
+    );
+  } finally {
+    harness.restore();
+  }
+});
+
+test("여러 예약을 삭제한 뒤 목록에서 모두 삭제됐는지 한 번에 확인한다", async () => {
+  const actions = [];
+  const harness = installJsonpDomHarness((url) => {
+    const payload = JSON.parse(url.searchParams.get("payload"));
+    actions.push(payload.action);
+
+    if (payload.action === "list") {
+      return {
+        ok: true,
+        reservations: [
+          {
+            id: "reservation-3",
+            date: validInput.date,
+            period: 3,
+            room: validInput.room,
+            grade: validInput.grade,
+            classNumber: validInput.classNumber,
+            createdAt: "2026-06-10T00:00:00.000Z"
+          }
+        ]
+      };
+    }
+
+    return {
+      ok: true,
+      deleted: true
+    };
+  });
+
+  try {
+    const result = await deleteReservationsAndConfirm(["reservation-1", "reservation-2"], "12", {
+      scriptUrl: "https://script.google.com/macros/s/example/exec"
+    });
+
+    assert.equal(result.deleted, true);
+    assert.equal(result.deletedCount, 2);
+    assert.deepEqual(result.reservations.map((reservation) => reservation.id), ["reservation-3"]);
+    assert.deepEqual(actions, ["delete", "delete", "list"]);
+  } finally {
+    harness.restore();
+  }
+});
+
+test("여러 예약 삭제 뒤 하나라도 목록에 남아 있으면 삭제 확인 실패로 분류한다", async () => {
+  const harness = installJsonpDomHarness((url) => {
+    const payload = JSON.parse(url.searchParams.get("payload"));
+
+    if (payload.action === "list") {
+      return {
+        ok: true,
+        reservations: [
+          {
+            id: "reservation-2",
+            date: validInput.date,
+            period: 2,
+            room: validInput.room,
+            grade: validInput.grade,
+            classNumber: validInput.classNumber,
+            createdAt: "2026-06-10T00:00:00.000Z"
+          }
+        ]
+      };
+    }
+
+    return {
+      ok: true,
+      deleted: true
+    };
+  });
+
+  try {
+    await assert.rejects(
+      () => deleteReservationsAndConfirm(["reservation-1", "reservation-2"], "12", {
         scriptUrl: "https://script.google.com/macros/s/example/exec"
       }),
       {
