@@ -71,16 +71,16 @@ test("중복 예약 오류는 이미 예약한 학년과 반을 알려준다", a
   });
 });
 
-test("유치원도 특별실을 예약할 수 있다", async () => {
+test("유치원은 반 선택 없이 특별실을 예약할 수 있다", async () => {
   await withStore(async (store) => {
     const created = await store.createReservation({
       ...validInput,
       grade: "유치원",
-      classNumber: 2
+      classNumber: ""
     });
 
     assert.equal(created.grade, "유치원");
-    assert.equal(created.classNumber, 2);
+    assert.equal(created.classNumber, null);
   });
 });
 

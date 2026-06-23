@@ -6,6 +6,6 @@ test("초등 학년과 반을 표시한다", () => {
   assert.equal(formatReservationOwner({ grade: 3, classNumber: 4 }), "3학년 4반");
 });
 
-test("유치원 반을 표시한다", () => {
-  assert.equal(formatReservationOwner({ grade: "유치원", classNumber: 2 }), "유치원 2반");
+test("유치원은 반 없이 표시한다", () => {
+  assert.equal(formatReservationOwner({ grade: "유치원", classNumber: null }), "유치원");
 });

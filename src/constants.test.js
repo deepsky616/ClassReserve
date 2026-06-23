@@ -18,6 +18,7 @@ test("예약 대상에는 유치원과 초등학교 학년이 포함된다", () 
 });
 
 test("초등학교 학년별 반 수를 학교 설정에 맞춘다", () => {
+  assert.deepEqual(CLASS_OPTIONS_BY_GRADE["유치원"], []);
   assert.deepEqual(CLASS_OPTIONS_BY_GRADE[1], [1, 2, 3, 4, 5]);
   assert.deepEqual(CLASS_OPTIONS_BY_GRADE[2], [1, 2, 3, 4, 5]);
   assert.deepEqual(CLASS_OPTIONS_BY_GRADE[3], [1, 2, 3, 4, 5]);

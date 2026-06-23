@@ -13,8 +13,8 @@ test("선택한 학년에 맞는 반 목록을 반환한다", () => {
   assert.deepEqual(getClassOptionsForGrade(6), [1, 2, 3, 4, 5, 6]);
 });
 
-test("유치원은 기존 반 범위를 유지한다", () => {
-  assert.deepEqual(getClassOptionsForGrade("유치원"), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+test("유치원은 반 선택 목록을 쓰지 않는다", () => {
+  assert.deepEqual(getClassOptionsForGrade("유치원"), []);
 });
 
 test("예약 가능 날짜는 오늘부터 8주 뒤까지다", () => {
