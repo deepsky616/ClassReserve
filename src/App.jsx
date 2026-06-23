@@ -1,10 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
-import { createReservationRangeAndConfirm, deleteReservationAndConfirm, fetchReservations } from "./api.js";
+import {
+  createReservationRangeAndConfirm,
+  deleteReservationAndConfirm,
+  deleteReservationsAndConfirm,
+  fetchReservations
+} from "./api.js";
 import { GRADES, KINDERGARTEN_GRADE, PERIODS, ROOM_TONE_CLASSES, ROOMS, WEEKDAY_LABELS } from "./constants.js";
 import { addWeeks, formatWeekRange, getStartOfWeek, getWeekDays, toDateKey } from "./dateUtils.js";
 import { getPeriodRange, getPeriodRangeLabel } from "./periodRange.js";
 import { formatReservationOwner } from "./reservationLabels.js";
 import { getDuplicateReservationGroups, getDuplicateReservationsToDelete } from "./reservationCleanup.js";
+import {
+  formatSelectedReservationSummary,
+  getSelectedReservations,
+  validateSameDateSelection
+} from "./selectionDelete.js";
 import {
   getClassOptionsForGrade,
   getReservationDateRange,
@@ -61,6 +71,8 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [cleaningDuplicates, setCleaningDuplicates] = useState(false);
+  const [deletingSelected, setDeletingSelected] = useState(false);
+  const [selectedReservationIds, setSelectedReservationIds] = useState(() => new Set());
   const [connectionStatus, setConnectionStatus] = useState("checking");
   const [viewMode, setViewMode] = useState("table");
 
@@ -72,6 +84,9 @@ export default function App() {
   const duplicateGroups = useMemo(() => getDuplicateReservationGroups(reservations), [reservations]);
   const duplicateReservations = useMemo(() => getDuplicateReservationsToDelete(reservations), [reservations]);
   const selectedPeriods = useMemo(() => getPeriodRange(form.startPeriod, form.endPeriod), [form.startPeriod, form.endPeriod]);
+  const selectedReservations = useMemo(() => {
+    return getSelectedReservations(reservations, selectedReservationIds);
+  }, [reservations, selectedReservationIds]);
 
   const visibleReservations = useMemo(() => {
     const weekKeys = new Set(weekDays.map((day) => day.key));
@@ -85,6 +100,14 @@ export default function App() {
   useEffect(() => {
     loadReservations();
   }, []);
+
+  useEffect(() => {
+    setSelectedReservationIds((current) => {
+      const existingIds = new Set(reservations.map((reservation) => reservation.id));
+      const next = new Set([...current].filter((id) => existingIds.has(id)));
+      return next.size === current.size ? current : next;
+    });
+  }, [reservations]);
 
   async function loadReservations() {
     setLoading(true);
@@ -187,6 +210,61 @@ export default function App() {
     }
   }
 
+  async function handleDeleteSelected() {
+    try {
+      validateSameDateSelection(selectedReservations);
+    } catch (error) {
+      setMessage({
+        type: "error",
+        text: errorMessage(error, "삭제할 예약을 선택해 주세요.")
+      });
+      return;
+    }
+
+    const summary = formatSelectedReservationSummary(selectedReservations);
+    const password = window.prompt(`${summary} 삭제 비밀번호 또는 관리자 비밀번호를 입력해 주세요.`);
+
+    if (!password) {
+      return;
+    }
+
+    const shouldDelete = window.confirm(`${summary}을 삭제할까요?`);
+
+    if (!shouldDelete) {
+      return;
+    }
+
+    setDeletingSelected(true);
+    try {
+      const ids = selectedReservations.map((reservation) => reservation.id);
+      const result = await deleteReservationsAndConfirm(ids, password);
+      setReservations(result.reservations);
+      setSelectedReservationIds(new Set());
+      setMessage({ type: "success", text: `선택한 예약 ${result.deletedCount}건을 삭제했습니다.` });
+    } catch (error) {
+      setMessage({
+        type: "error",
+        text: errorMessage(error, "선택한 예약을 삭제하지 못했습니다.")
+      });
+    } finally {
+      setDeletingSelected(false);
+    }
+  }
+
+  function toggleReservationSelection(reservationId) {
+    setSelectedReservationIds((current) => {
+      const next = new Set(current);
+
+      if (next.has(reservationId)) {
+        next.delete(reservationId);
+      } else {
+        next.add(reservationId);
+      }
+
+      return next;
+    });
+  }
+
   async function handleCleanupDuplicates() {
     if (duplicateReservations.length === 0) {
       setMessage({ type: "success", text: "정리할 중복 예약이 없습니다." });
@@ -245,11 +323,22 @@ export default function App() {
   }
 
   function renderReservationItem(reservation) {
+    const owner = formatReservationOwner(reservation);
+    const checked = selectedReservationIds.has(reservation.id);
+
     return (
       <article className={`reservation-item ${ROOM_TONE_CLASSES[reservation.room] ?? ""}`} key={reservation.id}>
+        <label className="select-reservation">
+          <input
+            type="checkbox"
+            checked={checked}
+            aria-label={`${reservation.room} ${owner} ${reservation.period}교시 선택`}
+            onChange={() => toggleReservationSelection(reservation.id)}
+          />
+        </label>
         <div>
           <strong>{reservation.room}</strong>
-          <span>{formatReservationOwner(reservation)}</span>
+          <span>{owner}</span>
         </div>
         <button
           type="button"
@@ -327,6 +416,26 @@ export default function App() {
               <button type="button" className="ghost-button" onClick={loadReservations}>
                 새로고침
               </button>
+
+              <div className="selection-actions" aria-label="선택 삭제">
+                <span>선택 {selectedReservations.length}건</span>
+                <button
+                  type="button"
+                  className="delete-selected-button"
+                  disabled={deletingSelected || selectedReservations.length === 0}
+                  onClick={handleDeleteSelected}
+                >
+                  {deletingSelected ? "삭제 중" : "선택 삭제"}
+                </button>
+                <button
+                  type="button"
+                  className="ghost-button compact"
+                  disabled={selectedReservations.length === 0}
+                  onClick={() => setSelectedReservationIds(new Set())}
+                >
+                  선택 해제
+                </button>
+              </div>
             </div>
 
             <div className={`schedule-scroll ${viewMode === "table" ? "" : "is-hidden"}`}>

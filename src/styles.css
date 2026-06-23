@@ -217,6 +217,32 @@ button:focus-visible {
   white-space: nowrap;
 }
 
+.ghost-button.compact {
+  min-height: 36px;
+  padding: 0 10px;
+}
+
+.selection-actions {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.selection-actions span {
+  color: var(--subtle);
+  font-size: 13px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.delete-selected-button {
+  border-color: rgba(180, 35, 24, 0.3);
+  color: var(--danger);
+  font-weight: 900;
+  min-height: 36px;
+}
+
 .schedule-scroll {
   overflow-x: auto;
 }
@@ -290,13 +316,27 @@ button:focus-visible {
 
 .reservation-item {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: auto 1fr auto;
   gap: 8px;
   align-items: center;
   border-left: 4px solid var(--accent);
   border-radius: 6px;
   background: var(--accent-soft);
   padding: 8px;
+}
+
+.select-reservation {
+  align-items: center;
+  display: flex;
+  gap: 0;
+}
+
+.select-reservation input {
+  accent-color: var(--accent);
+  cursor: pointer;
+  min-height: 18px;
+  padding: 0;
+  width: 18px;
 }
 
 .reservation-item.tone-hall {
@@ -535,9 +575,15 @@ form {
   }
 
   .connection-badge,
+  .selection-actions,
   .view-toggle,
   .view-toggle button {
     width: 100%;
+  }
+
+  .selection-actions {
+    display: grid;
+    grid-template-columns: 1fr;
   }
 
   .view-toggle {
