@@ -13,7 +13,7 @@ import {
 const validInput = {
   date: "2026-06-19",
   period: 1,
-  room: "창의놀이실",
+  room: "창의놀이실(1층)",
   grade: 1,
   classNumber: 1,
   password: "12"
@@ -84,7 +84,7 @@ test("JSONP로 예약 목록을 조회한다", async () => {
 
     assert.equal(payload.action, "list");
     assert.equal(reservations.length, 1);
-    assert.equal(reservations[0].room, "창의놀이실");
+    assert.equal(reservations[0].room, "창의놀이실(1층)");
     assert.equal(reservations[0].date, "2026-06-23");
   } finally {
     harness.restore();
@@ -113,7 +113,7 @@ test("JSONP로 예약을 생성한다", async () => {
     const payload = JSON.parse(scriptUrl.searchParams.get("payload"));
 
     assert.equal(payload.action, "create");
-    assert.equal(payload.reservation.room, "창의놀이실");
+    assert.equal(payload.reservation.room, "창의놀이실(1층)");
     assert.equal(reservation.id, "reservation-2");
   } finally {
     harness.restore();
