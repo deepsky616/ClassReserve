@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { createReservation, deleteReservation, fetchReservations } from "./api.js";
+import { createReservationAndConfirm, deleteReservation, fetchReservations } from "./api.js";
 import { GRADES, KINDERGARTEN_GRADE, PERIODS, ROOM_TONE_CLASSES, ROOMS, WEEKDAY_LABELS } from "./constants.js";
 import { addWeeks, formatWeekRange, getStartOfWeek, getWeekDays, toDateKey } from "./dateUtils.js";
 import { formatReservationOwner } from "./reservationLabels.js";
@@ -10,6 +10,7 @@ import {
   normalizeClassNumberValue,
   normalizeGradeValue
 } from "./reservationRules.js";
+import { findReservationConflict, formatReservationConflictMessage } from "./reservationConflicts.js";
 
 const initialForm = {
   date: toDateKey(new Date()),
@@ -27,7 +28,8 @@ const messageByCode = {
   NOT_FOUND: "예약을 찾을 수 없습니다.",
   CONFIG_MISSING: "구글 앱스 스크립트 주소가 설정되지 않았습니다.",
   GOOGLE_SCRIPT_UNAVAILABLE: "구글 시트 저장소에 연결할 수 없습니다.",
-  GOOGLE_SCRIPT_ERROR: "구글 시트 저장소 요청을 처리하지 못했습니다."
+  GOOGLE_SCRIPT_ERROR: "구글 시트 저장소 요청을 처리하지 못했습니다.",
+  PERSISTENCE_UNCONFIRMED: "예약 저장을 확인하지 못했습니다. 저장소 배포 상태를 확인해 주세요."
 };
 
 function errorMessage(error, fallback) {
@@ -121,14 +123,22 @@ export default function App() {
 
     setSaving(true);
     try {
-      const reservation = await createReservation({
+      const reservationInput = {
         ...form,
         period: Number(form.period),
         grade: normalizeGradeForSubmit(form.grade),
         classNumber: normalizeClassNumberValue(form.grade, form.classNumber),
         password: form.password.trim()
-      });
-      setReservations((current) => [...current, reservation]);
+      };
+      const conflict = findReservationConflict(reservations, reservationInput);
+
+      if (conflict) {
+        setMessage({ type: "error", text: formatReservationConflictMessage(conflict) });
+        return;
+      }
+
+      const result = await createReservationAndConfirm(reservationInput);
+      setReservations(result.reservations);
       setMessage({ type: "success", text: "예약되었습니다." });
       setForm((current) => ({ ...current, password: "" }));
     } catch (error) {

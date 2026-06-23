@@ -1,3 +1,5 @@
+import { toDateKey } from "./dateUtils.js";
+
 const DEFAULT_TIMEOUT_MS = 15000;
 
 function getConfiguredScriptUrl(options = {}) {
@@ -60,9 +62,42 @@ function createClientError(message, code) {
   return error;
 }
 
+function isPersistedReservation(reservation, reservations) {
+  return reservations.some((item) => {
+    return (
+      item.id === reservation.id ||
+      (
+        item.date === reservation.date &&
+        Number(item.period) === Number(reservation.period) &&
+        item.room === reservation.room
+      )
+    );
+  });
+}
+
+function normalizeDateValue(value) {
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return value;
+  }
+
+  const date = new Date(value);
+  if (!Number.isNaN(date.getTime())) {
+    return toDateKey(date);
+  }
+
+  return value;
+}
+
+function normalizeReservation(reservation) {
+  return {
+    ...reservation,
+    date: normalizeDateValue(reservation.date)
+  };
+}
+
 export async function fetchReservations(options) {
   const body = await callGoogleScript({ action: "list" }, options);
-  return body.reservations;
+  return body.reservations.map(normalizeReservation);
 }
 
 export async function createReservation(input, options) {
@@ -73,7 +108,24 @@ export async function createReservation(input, options) {
     },
     options
   );
-  return body.reservation;
+  return normalizeReservation(body.reservation);
+}
+
+export async function createReservationAndConfirm(input, options) {
+  const reservation = await createReservation(input, options);
+  const reservations = await fetchReservations(options);
+
+  if (!isPersistedReservation(reservation, reservations)) {
+    throw createClientError(
+      "예약 저장을 확인하지 못했습니다. 저장소 배포 상태를 확인해 주세요.",
+      "PERSISTENCE_UNCONFIRMED"
+    );
+  }
+
+  return {
+    reservation,
+    reservations
+  };
 }
 
 export async function deleteReservation(id, password, options) {

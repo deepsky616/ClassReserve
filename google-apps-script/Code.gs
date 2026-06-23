@@ -173,6 +173,8 @@ function ensureHeader(sheet) {
   if (!hasHeader) {
     sheet.getRange(1, 1, 1, HEADER.length).setValues([HEADER]);
   }
+
+  sheet.getRange(2, 2, Math.max(sheet.getMaxRows() - 1, 1), 1).setNumberFormat("@");
 }
 
 function readRows(sheet) {
@@ -193,7 +195,7 @@ function readRows(sheet) {
 function rowToReservation(row) {
   return {
     id: String(row[0]),
-    date: String(row[1]),
+    date: normalizeDate(row[1]),
     period: Number(row[2]),
     room: String(row[3]),
     grade: normalizeGrade(row[4]),
@@ -201,6 +203,19 @@ function rowToReservation(row) {
     passwordHash: String(row[6]),
     createdAt: String(row[7])
   };
+}
+
+function normalizeDate(value) {
+  if (Object.prototype.toString.call(value) === "[object Date]" && !isNaN(value.getTime())) {
+    return formatDateKey(value);
+  }
+
+  const parsedDate = new Date(value);
+  if (!isNaN(parsedDate.getTime())) {
+    return formatDateKey(parsedDate);
+  }
+
+  return String(value);
 }
 
 function toPublicReservation(reservation) {
