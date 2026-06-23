@@ -77,7 +77,7 @@ test("중복 예약은 거부한다", async () => {
         const body = await response.json();
         assert.equal(response.status, 409);
         assert.equal(body.code, "DUPLICATE_RESERVATION");
-        assert.equal(body.message, "이미 1학년 2반이 예약한 특별실입니다.");
+        assert.equal(body.message, "이미 1학년 2반이 먼저 예약해서 예약할 수 없습니다.");
       }
     }
   });
