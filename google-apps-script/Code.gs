@@ -90,7 +90,7 @@ function createReservation(input) {
     });
 
     if (duplicate) {
-      throw createError("이미 " + formatReservationOwner(duplicate) + "이 예약한 특별실입니다.", "DUPLICATE_RESERVATION");
+      throw createError("이미 " + formatReservationOwner(duplicate) + "이 먼저 예약해서 예약할 수 없습니다.", "DUPLICATE_RESERVATION");
     }
 
     const reservation = {

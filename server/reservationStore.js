@@ -59,7 +59,7 @@ export function createReservationStore(options = {}) {
 
     if (duplicate) {
       throw createError(
-        `이미 ${formatReservationOwner(duplicate)}이 예약한 특별실입니다.`,
+        `이미 ${formatReservationOwner(duplicate)}이 먼저 예약해서 예약할 수 없습니다.`,
         "DUPLICATE_RESERVATION",
         409,
         { conflictReservation: stripPrivateFields(duplicate) }
