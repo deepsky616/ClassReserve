@@ -115,13 +115,16 @@ test("앱스 스크립트 오류 응답을 같은 코드로 던진다", async ()
   const harness = installJsonpDomHarness(() => ({
     ok: false,
     code: "DUPLICATE_RESERVATION",
-    message: "이미 예약된 특별실입니다."
+    message: "이미 2학년 3반이 예약한 특별실입니다."
   }));
 
   try {
     await assert.rejects(
       () => createReservation(validInput, { scriptUrl: "https://script.google.com/macros/s/example/exec" }),
-      { code: "DUPLICATE_RESERVATION" }
+      {
+        code: "DUPLICATE_RESERVATION",
+        message: "이미 2학년 3반이 예약한 특별실입니다."
+      }
     );
   } finally {
     harness.restore();

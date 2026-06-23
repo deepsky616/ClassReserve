@@ -56,6 +56,33 @@ test("같은 날짜와 교시와 특별실은 중복 예약할 수 없다", asyn
   });
 });
 
+test("중복 예약 오류는 이미 예약한 학년과 반을 알려준다", async () => {
+  await withStore(async (store) => {
+    await store.createReservation(validInput);
+
+    await assert.rejects(
+      () => store.createReservation({ ...validInput, grade: 5, classNumber: 1 }),
+      {
+        code: "DUPLICATE_RESERVATION",
+        message: "이미 3학년 4반이 예약한 특별실입니다."
+      }
+    );
+  });
+});
+
+test("유치원도 특별실을 예약할 수 있다", async () => {
+  await withStore(async (store) => {
+    const created = await store.createReservation({
+      ...validInput,
+      grade: "유치원",
+      classNumber: 2
+    });
+
+    assert.equal(created.grade, "유치원");
+    assert.equal(created.classNumber, 2);
+  });
+});
+
 test("필수 입력이 없으면 예약을 만들지 않는다", async () => {
   await withStore(async (store) => {
     await assert.rejects(
