@@ -369,6 +369,11 @@ button:focus-visible {
   background: var(--accent-soft);
 }
 
+.reservation-item.tone-activity {
+  border-left-color: #0891b2;
+  background: #cffafe;
+}
+
 .reservation-item strong,
 .reservation-item span {
   display: block;

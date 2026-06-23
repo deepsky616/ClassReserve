@@ -9,9 +9,9 @@ import {
   normalizeClassNumberValue,
   normalizeGradeValue
 } from "../src/reservationRules.js";
+import { isAllowedRoom, normalizeRoomName } from "../src/roomUtils.js";
 
 const REQUIRED_FIELDS = ["date", "period", "room", "grade", "password"];
-const ALLOWED_ROOMS = new Set(["창의놀이실", "청계누리(강당)", "컴퓨터실(4층)", "AI실(2층)", "음악실", "다모임실"]);
 const KINDERGARTEN_GRADE = "유치원";
 
 export function createReservationStore(options = {}) {
@@ -79,7 +79,7 @@ export function createReservationStore(options = {}) {
         id: id(),
         date: input.date,
         period: Number(input.period),
-        room: input.room,
+        room: normalizeRoomName(input.room),
         grade: normalizeGradeValue(input.grade),
         classNumber: normalizeClassNumberValue(input.grade, input.classNumber),
         passwordHash: createPasswordHash(input.password),
@@ -144,7 +144,7 @@ function validateReservationInput(input, baseDate) {
     throw createError("예약 날짜는 오늘부터 8주 뒤까지만 선택할 수 있습니다.", "VALIDATION_ERROR", 400);
   }
 
-  if (!ALLOWED_ROOMS.has(input.room)) {
+  if (!isAllowedRoom(input.room)) {
     throw createError("선택할 수 없는 특별실입니다.", "VALIDATION_ERROR", 400);
   }
 
@@ -184,7 +184,7 @@ function isSameSlot(reservation, input) {
   return (
     reservation.date === input.date &&
     Number(reservation.period) === Number(input.period) &&
-    reservation.room === input.room
+    normalizeRoomName(reservation.room) === normalizeRoomName(input.room)
   );
 }
 
@@ -202,6 +202,7 @@ function stripPrivateFields(reservation) {
   const { passwordHash, ...publicReservation } = reservation;
   return {
     ...publicReservation,
+    room: normalizeRoomName(publicReservation.room),
     period: Number(publicReservation.period),
     grade: normalizeGradeValue(publicReservation.grade),
     classNumber: normalizeClassNumberValue(publicReservation.grade, publicReservation.classNumber)

@@ -1,4 +1,5 @@
 import { toDateKey } from "./dateUtils.js";
+import { normalizeRoomName } from "./roomUtils.js";
 import {
   findReservationConflict,
   findReservationRangeConflict,
@@ -97,7 +98,8 @@ function normalizeDateValue(value) {
 function normalizeReservation(reservation) {
   return {
     ...reservation,
-    date: normalizeDateValue(reservation.date)
+    date: normalizeDateValue(reservation.date),
+    room: normalizeRoomName(reservation.room)
   };
 }
 

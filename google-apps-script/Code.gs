@@ -1,7 +1,10 @@
 const SHEET_NAME = "reservations";
 const SPREADSHEET_ID_PROPERTY = "SPREADSHEET_ID";
 const ADMIN_DELETE_PASSWORD_PROPERTY = "ADMIN_DELETE_PASSWORD";
-const ALLOWED_ROOMS = ["창의놀이실", "청계누리(강당)", "컴퓨터실(4층)", "AI실(2층)", "음악실", "다모임실"];
+const ALLOWED_ROOMS = ["창의놀이실(1층)", "청계누리(강당)", "컴퓨터실(4층)", "AI실(2층)", "음악실", "다모임실", "신체활동실(1층)"];
+const ROOM_ALIASES = {
+  "창의놀이실": "창의놀이실(1층)"
+};
 const KINDERGARTEN_GRADE = "유치원";
 const RESERVATION_WINDOW_DAYS = 56;
 const CLASS_OPTIONS_BY_GRADE = {
@@ -112,7 +115,7 @@ function createReservations(inputs) {
         id: Utilities.getUuid(),
         date: input.date,
         period: Number(input.period),
-        room: input.room,
+        room: normalizeRoomName(input.room),
         grade: normalizeGrade(input.grade),
         classNumber: normalizeClassNumber(input.grade, input.classNumber),
         passwordHash: hashPassword(input.password),
@@ -216,7 +219,7 @@ function rowToReservation(row) {
     id: String(row[0]),
     date: normalizeDate(row[1]),
     period: Number(row[2]),
-    room: String(row[3]),
+    room: normalizeRoomName(row[3]),
     grade: normalizeGrade(row[4]),
     classNumber: normalizeClassNumber(row[4], row[5]),
     passwordHash: String(row[6]),
@@ -242,7 +245,7 @@ function toPublicReservation(reservation) {
     id: reservation.id,
     date: reservation.date,
     period: Number(reservation.period),
-    room: reservation.room,
+    room: normalizeRoomName(reservation.room),
     grade: normalizeGrade(reservation.grade),
     classNumber: normalizeClassNumber(reservation.grade, reservation.classNumber),
     createdAt: reservation.createdAt
@@ -271,7 +274,7 @@ function validateReservation(input) {
     throw createError("예약 날짜는 오늘부터 8주 뒤까지만 선택할 수 있습니다.", "VALIDATION_ERROR");
   }
 
-  if (ALLOWED_ROOMS.indexOf(input.room) === -1) {
+  if (ALLOWED_ROOMS.indexOf(normalizeRoomName(input.room)) === -1) {
     throw createError("선택할 수 없는 특별실입니다.", "VALIDATION_ERROR");
   }
 
@@ -311,8 +314,13 @@ function isSameSlot(reservation, input) {
   return (
     reservation.date === input.date &&
     Number(reservation.period) === Number(input.period) &&
-    reservation.room === input.room
+    normalizeRoomName(reservation.room) === normalizeRoomName(input.room)
   );
+}
+
+function normalizeRoomName(room) {
+  const value = String(room);
+  return ROOM_ALIASES[value] || value;
 }
 
 function isKindergartenGrade(value) {
