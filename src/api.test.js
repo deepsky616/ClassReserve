@@ -59,7 +59,7 @@ test("JSONP로 예약 목록을 조회한다", async () => {
     reservations: [
       {
         id: "reservation-1",
-        date: "2026-06-19",
+        date: "Tue Jun 23 2026 00:00:00 GMT+0900 (한국 표준시)",
         period: 1,
         room: "창의놀이실",
         grade: 1,
@@ -77,6 +77,7 @@ test("JSONP로 예약 목록을 조회한다", async () => {
     assert.equal(payload.action, "list");
     assert.equal(reservations.length, 1);
     assert.equal(reservations[0].room, "창의놀이실");
+    assert.equal(reservations[0].date, "2026-06-23");
   } finally {
     harness.restore();
   }
