@@ -1,4 +1,5 @@
 import { toDateKey } from "./dateUtils.js";
+import { findReservationConflict, formatReservationConflictMessage } from "./reservationConflicts.js";
 
 const DEFAULT_TIMEOUT_MS = 15000;
 
@@ -112,6 +113,16 @@ export async function createReservation(input, options) {
 }
 
 export async function createReservationAndConfirm(input, options) {
+  const latestReservations = await fetchReservations(options);
+  const conflict = findReservationConflict(latestReservations, input);
+
+  if (conflict) {
+    throw createClientError(
+      formatReservationConflictMessage(conflict),
+      "DUPLICATE_RESERVATION"
+    );
+  }
+
   const reservation = await createReservation(input, options);
   const reservations = await fetchReservations(options);
 
