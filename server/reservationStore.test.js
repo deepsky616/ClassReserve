@@ -5,13 +5,14 @@ import path from "node:path";
 import test from "node:test";
 import { createReservationStore } from "./reservationStore.js";
 
-async function withStore(run) {
+async function withStore(run, options = {}) {
   const directory = await mkdtemp(path.join(tmpdir(), "class-reserve-"));
   const filePath = path.join(directory, "reservations.json");
   const store = createReservationStore({
     filePath,
     now: () => "2026-06-10T00:00:00.000Z",
-    id: () => "reservation-1"
+    id: () => "reservation-1",
+    ...options
   });
 
   try {
@@ -83,6 +84,40 @@ test("유치원도 특별실을 예약할 수 있다", async () => {
   });
 });
 
+test("학년별 반 수를 넘으면 예약할 수 없다", async () => {
+  await withStore(async (store) => {
+    await assert.rejects(
+      () => store.createReservation({ ...validInput, grade: 1, classNumber: 6 }),
+      { code: "VALIDATION_ERROR" }
+    );
+
+    await assert.rejects(
+      () => store.createReservation({ ...validInput, grade: 4, classNumber: 8 }),
+      { code: "VALIDATION_ERROR" }
+    );
+
+    const sixthGrade = await store.createReservation({ ...validInput, grade: 6, classNumber: 6 });
+    assert.equal(sixthGrade.classNumber, 6);
+  });
+});
+
+test("예약 날짜는 오늘부터 8주 뒤까지만 허용한다", async () => {
+  await withStore(async (store) => {
+    await assert.rejects(
+      () => store.createReservation({ ...validInput, date: "2026-06-09" }),
+      { code: "VALIDATION_ERROR" }
+    );
+
+    await assert.rejects(
+      () => store.createReservation({ ...validInput, date: "2026-08-06" }),
+      { code: "VALIDATION_ERROR" }
+    );
+
+    const created = await store.createReservation({ ...validInput, date: "2026-08-05" });
+    assert.equal(created.date, "2026-08-05");
+  });
+});
+
 test("필수 입력이 없으면 예약을 만들지 않는다", async () => {
   await withStore(async (store) => {
     await assert.rejects(
@@ -148,4 +183,14 @@ test("틀린 삭제 비밀번호로는 예약을 삭제하지 않는다", async 
 
     assert.equal((await store.listReservations()).length, 1);
   });
+});
+
+test("관리자 비밀번호로 예약을 삭제할 수 있다", async () => {
+  await withStore(async (store) => {
+    const created = await store.createReservation(validInput);
+    const result = await store.deleteReservation(created.id, "admin-pass");
+
+    assert.equal(result.deleted, true);
+    assert.deepEqual(await store.listReservations(), []);
+  }, { adminPassword: "admin-pass" });
 });
