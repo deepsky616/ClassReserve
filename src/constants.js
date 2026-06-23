@@ -16,7 +16,7 @@ export const GRADES = [KINDERGARTEN_GRADE, 1, 2, 3, 4, 5, 6];
 export const CLASSES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
 export const CLASS_OPTIONS_BY_GRADE = {
-  [KINDERGARTEN_GRADE]: CLASSES,
+  [KINDERGARTEN_GRADE]: [],
   1: [1, 2, 3, 4, 5],
   2: [1, 2, 3, 4, 5],
   3: [1, 2, 3, 4, 5],

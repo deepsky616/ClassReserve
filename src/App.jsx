@@ -3,7 +3,13 @@ import { createReservation, deleteReservation, fetchReservations } from "./api.j
 import { GRADES, KINDERGARTEN_GRADE, PERIODS, ROOM_TONE_CLASSES, ROOMS, WEEKDAY_LABELS } from "./constants.js";
 import { addWeeks, formatWeekRange, getStartOfWeek, getWeekDays, toDateKey } from "./dateUtils.js";
 import { formatReservationOwner } from "./reservationLabels.js";
-import { getClassOptionsForGrade, getReservationDateRange, normalizeGradeValue } from "./reservationRules.js";
+import {
+  getClassOptionsForGrade,
+  getReservationDateRange,
+  isKindergartenGrade,
+  normalizeClassNumberValue,
+  normalizeGradeValue
+} from "./reservationRules.js";
 
 const initialForm = {
   date: toDateKey(new Date()),
@@ -55,6 +61,7 @@ export default function App() {
   const todayKey = useMemo(() => toDateKey(new Date()), []);
   const dateRange = useMemo(() => getReservationDateRange(new Date()), []);
   const classOptions = useMemo(() => getClassOptionsForGrade(form.grade), [form.grade]);
+  const isKindergarten = isKindergartenGrade(form.grade);
 
   const visibleReservations = useMemo(() => {
     const weekKeys = new Set(weekDays.map((day) => day.key));
@@ -93,7 +100,9 @@ export default function App() {
 
       if (field === "grade") {
         const nextClassOptions = getClassOptionsForGrade(value);
-        if (!nextClassOptions.includes(Number(next.classNumber))) {
+        if (nextClassOptions.length === 0) {
+          next.classNumber = "";
+        } else if (!nextClassOptions.includes(Number(next.classNumber))) {
           next.classNumber = nextClassOptions[0];
         }
       }
@@ -116,7 +125,7 @@ export default function App() {
         ...form,
         period: Number(form.period),
         grade: normalizeGradeForSubmit(form.grade),
-        classNumber: Number(form.classNumber),
+        classNumber: normalizeClassNumberValue(form.grade, form.classNumber),
         password: form.password.trim()
       });
       setReservations((current) => [...current, reservation]);
@@ -379,16 +388,18 @@ export default function App() {
                   </select>
                 </label>
 
-                <label>
-                  반
-                  <select value={form.classNumber} onChange={(event) => updateForm("classNumber", event.target.value)}>
-                    {classOptions.map((classNumber) => (
-                      <option key={classNumber} value={classNumber}>
-                        {classNumber}반
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                {isKindergarten ? null : (
+                  <label>
+                    반
+                    <select value={form.classNumber} onChange={(event) => updateForm("classNumber", event.target.value)}>
+                      {classOptions.map((classNumber) => (
+                        <option key={classNumber} value={classNumber}>
+                          {classNumber}반
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
               </div>
 
               <label>

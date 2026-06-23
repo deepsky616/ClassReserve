@@ -5,7 +5,7 @@ const ALLOWED_ROOMS = ["창의놀이실", "청계누리(강당)", "컴퓨터실(
 const KINDERGARTEN_GRADE = "유치원";
 const RESERVATION_WINDOW_DAYS = 56;
 const CLASS_OPTIONS_BY_GRADE = {
-  "유치원": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+  "유치원": [],
   "1": [1, 2, 3, 4, 5],
   "2": [1, 2, 3, 4, 5],
   "3": [1, 2, 3, 4, 5],
@@ -99,7 +99,7 @@ function createReservation(input) {
       period: Number(input.period),
       room: input.room,
       grade: normalizeGrade(input.grade),
-      classNumber: Number(input.classNumber),
+      classNumber: normalizeClassNumber(input.grade, input.classNumber),
       passwordHash: hashPassword(input.password),
       createdAt: new Date().toISOString()
     };
@@ -197,7 +197,7 @@ function rowToReservation(row) {
     period: Number(row[2]),
     room: String(row[3]),
     grade: normalizeGrade(row[4]),
-    classNumber: Number(row[5]),
+    classNumber: normalizeClassNumber(row[4], row[5]),
     passwordHash: String(row[6]),
     createdAt: String(row[7])
   };
@@ -210,7 +210,7 @@ function toPublicReservation(reservation) {
     period: Number(reservation.period),
     room: reservation.room,
     grade: normalizeGrade(reservation.grade),
-    classNumber: Number(reservation.classNumber),
+    classNumber: normalizeClassNumber(reservation.grade, reservation.classNumber),
     createdAt: reservation.createdAt
   };
 }
@@ -220,7 +220,7 @@ function validateReservation(input) {
     throw createError("예약 내용이 없습니다.", "VALIDATION_ERROR");
   }
 
-  const requiredFields = ["date", "period", "room", "grade", "classNumber", "password"];
+  const requiredFields = ["date", "period", "room", "grade", "password"];
   const missing = requiredFields.filter(function (field) {
     return input[field] === undefined || input[field] === null || input[field] === "";
   });
@@ -249,12 +249,18 @@ function validateReservation(input) {
     throw createError("학년은 유치원 또는 1학년부터 6학년까지 선택할 수 있습니다.", "VALIDATION_ERROR");
   }
 
-  if (!isIntegerInRange(input.classNumber, 1, 10)) {
-    throw createError("반은 1반부터 10반까지 선택할 수 있습니다.", "VALIDATION_ERROR");
-  }
+  if (!isKindergartenGrade(input.grade)) {
+    if (input.classNumber === undefined || input.classNumber === null || input.classNumber === "") {
+      throw createError("반을 선택해 주세요.", "VALIDATION_ERROR");
+    }
 
-  if (getClassOptionsForGrade(input.grade).indexOf(Number(input.classNumber)) === -1) {
-    throw createError("선택한 학년에 없는 반입니다.", "VALIDATION_ERROR");
+    if (!isIntegerInRange(input.classNumber, 1, 10)) {
+      throw createError("반은 1반부터 10반까지 선택할 수 있습니다.", "VALIDATION_ERROR");
+    }
+
+    if (getClassOptionsForGrade(input.grade).indexOf(Number(input.classNumber)) === -1) {
+      throw createError("선택한 학년에 없는 반입니다.", "VALIDATION_ERROR");
+    }
   }
 }
 
@@ -267,8 +273,20 @@ function isValidGrade(value) {
   return value === KINDERGARTEN_GRADE || isIntegerInRange(value, 1, 6);
 }
 
+function isKindergartenGrade(value) {
+  return normalizeGrade(value) === KINDERGARTEN_GRADE;
+}
+
 function normalizeGrade(value) {
   return value === KINDERGARTEN_GRADE ? KINDERGARTEN_GRADE : Number(value);
+}
+
+function normalizeClassNumber(grade, classNumber) {
+  if (isKindergartenGrade(grade)) {
+    return null;
+  }
+
+  return Number(classNumber);
 }
 
 function getClassOptionsForGrade(grade) {
@@ -294,8 +312,11 @@ function getAdminDeletePassword() {
 
 function formatReservationOwner(reservation) {
   const grade = normalizeGrade(reservation.grade);
-  const gradeLabel = grade === KINDERGARTEN_GRADE ? KINDERGARTEN_GRADE : grade + "학년";
-  return gradeLabel + " " + Number(reservation.classNumber) + "반";
+  if (grade === KINDERGARTEN_GRADE) {
+    return KINDERGARTEN_GRADE;
+  }
+
+  return grade + "학년 " + Number(reservation.classNumber) + "반";
 }
 
 function hashPassword(password) {

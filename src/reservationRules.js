@@ -7,6 +7,18 @@ export function normalizeGradeValue(grade) {
   return grade === KINDERGARTEN_GRADE ? KINDERGARTEN_GRADE : Number(grade);
 }
 
+export function isKindergartenGrade(grade) {
+  return normalizeGradeValue(grade) === KINDERGARTEN_GRADE;
+}
+
+export function normalizeClassNumberValue(grade, classNumber) {
+  if (isKindergartenGrade(grade)) {
+    return null;
+  }
+
+  return Number(classNumber);
+}
+
 export function getClassOptionsForGrade(grade) {
   const normalizedGrade = normalizeGradeValue(grade);
   return CLASS_OPTIONS_BY_GRADE[normalizedGrade] ?? CLASSES;
