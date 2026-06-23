@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { createPasswordHash, verifyPassword } from "./password.js";
+import { getClassOptionsForGrade, isDateInReservationWindow, normalizeGradeValue } from "../src/reservationRules.js";
 
 const REQUIRED_FIELDS = ["date", "period", "room", "grade", "classNumber", "password"];
 const ALLOWED_ROOMS = new Set(["창의놀이실", "청계누리(강당)", "컴퓨터실(4층)", "AI실(2층)", "음악실", "다모임실"]);
@@ -11,6 +12,7 @@ export function createReservationStore(options = {}) {
   const filePath = options.filePath ?? path.resolve("data/reservations.json");
   const now = options.now ?? (() => new Date().toISOString());
   const id = options.id ?? (() => randomUUID());
+  const adminPassword = options.adminPassword ?? process.env.ADMIN_DELETE_PASSWORD ?? "";
 
   async function readReservations() {
     try {
@@ -39,7 +41,7 @@ export function createReservationStore(options = {}) {
   }
 
   async function createReservation(input) {
-    validateReservationInput(input);
+    validateReservationInput(input, new Date(now()));
     const reservations = await readReservations();
     const duplicate = reservations.find((reservation) => {
       return (
@@ -63,7 +65,7 @@ export function createReservationStore(options = {}) {
       date: input.date,
       period: Number(input.period),
       room: input.room,
-      grade: normalizeGrade(input.grade),
+      grade: normalizeGradeValue(input.grade),
       classNumber: Number(input.classNumber),
       passwordHash: createPasswordHash(input.password),
       createdAt: now()
@@ -85,7 +87,7 @@ export function createReservationStore(options = {}) {
       throw createError("예약을 찾을 수 없습니다.", "NOT_FOUND", 404);
     }
 
-    if (!verifyPassword(password, reservation.passwordHash)) {
+    if (!verifyPassword(password, reservation.passwordHash) && password !== adminPassword) {
       throw createError("삭제 비밀번호가 맞지 않습니다.", "INVALID_PASSWORD", 403);
     }
 
@@ -108,7 +110,7 @@ export function createError(message, code, status = 400, details = {}) {
   return error;
 }
 
-function validateReservationInput(input) {
+function validateReservationInput(input, baseDate) {
   const missing = REQUIRED_FIELDS.filter((field) => {
     return input?.[field] === undefined || input?.[field] === null || input?.[field] === "";
   });
@@ -119,6 +121,10 @@ function validateReservationInput(input) {
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date)) {
     throw createError("날짜 형식이 올바르지 않습니다.", "VALIDATION_ERROR", 400);
+  }
+
+  if (!isDateInReservationWindow(input.date, baseDate)) {
+    throw createError("예약 날짜는 오늘부터 8주 뒤까지만 선택할 수 있습니다.", "VALIDATION_ERROR", 400);
   }
 
   if (!ALLOWED_ROOMS.has(input.room)) {
@@ -136,6 +142,10 @@ function validateReservationInput(input) {
   if (!isNumberInRange(input.classNumber, 1, 10)) {
     throw createError("반은 1반부터 10반까지 선택할 수 있습니다.", "VALIDATION_ERROR", 400);
   }
+
+  if (!getClassOptionsForGrade(input.grade).includes(Number(input.classNumber))) {
+    throw createError("선택한 학년에 없는 반입니다.", "VALIDATION_ERROR", 400);
+  }
 }
 
 function isNumberInRange(value, min, max) {
@@ -147,12 +157,8 @@ function isValidGrade(value) {
   return value === KINDERGARTEN_GRADE || isNumberInRange(value, 1, 6);
 }
 
-function normalizeGrade(value) {
-  return value === KINDERGARTEN_GRADE ? KINDERGARTEN_GRADE : Number(value);
-}
-
 function formatReservationOwner(reservation) {
-  const grade = normalizeGrade(reservation.grade);
+  const grade = normalizeGradeValue(reservation.grade);
   const gradeLabel = grade === KINDERGARTEN_GRADE ? KINDERGARTEN_GRADE : `${grade}학년`;
   return `${gradeLabel} ${Number(reservation.classNumber)}반`;
 }
@@ -162,7 +168,7 @@ function stripPrivateFields(reservation) {
   return {
     ...publicReservation,
     period: Number(publicReservation.period),
-    grade: normalizeGrade(publicReservation.grade),
+    grade: normalizeGradeValue(publicReservation.grade),
     classNumber: Number(publicReservation.classNumber)
   };
 }

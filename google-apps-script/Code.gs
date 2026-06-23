@@ -1,7 +1,18 @@
 const SHEET_NAME = "reservations";
 const SPREADSHEET_ID_PROPERTY = "SPREADSHEET_ID";
+const ADMIN_DELETE_PASSWORD_PROPERTY = "ADMIN_DELETE_PASSWORD";
 const ALLOWED_ROOMS = ["창의놀이실", "청계누리(강당)", "컴퓨터실(4층)", "AI실(2층)", "음악실", "다모임실"];
 const KINDERGARTEN_GRADE = "유치원";
+const RESERVATION_WINDOW_DAYS = 56;
+const CLASS_OPTIONS_BY_GRADE = {
+  "유치원": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+  "1": [1, 2, 3, 4, 5],
+  "2": [1, 2, 3, 4, 5],
+  "3": [1, 2, 3, 4, 5],
+  "4": [1, 2, 3, 4, 5, 6, 7],
+  "5": [1, 2, 3, 4, 5, 6, 7],
+  "6": [1, 2, 3, 4, 5, 6]
+};
 const HEADER = ["id", "date", "period", "room", "grade", "classNumber", "passwordHash", "createdAt"];
 
 function doGet(e) {
@@ -120,7 +131,7 @@ function deleteReservation(id, password) {
       const reservation = rowToReservation(row);
 
       if (reservation.id === id) {
-        if (reservation.passwordHash !== hashPassword(password)) {
+        if (reservation.passwordHash !== hashPassword(password) && password !== getAdminDeletePassword()) {
           throw createError("삭제 비밀번호가 맞지 않습니다.", "INVALID_PASSWORD");
         }
 
@@ -222,6 +233,10 @@ function validateReservation(input) {
     throw createError("날짜 형식이 올바르지 않습니다.", "VALIDATION_ERROR");
   }
 
+  if (!isDateInReservationWindow(input.date)) {
+    throw createError("예약 날짜는 오늘부터 8주 뒤까지만 선택할 수 있습니다.", "VALIDATION_ERROR");
+  }
+
   if (ALLOWED_ROOMS.indexOf(input.room) === -1) {
     throw createError("선택할 수 없는 특별실입니다.", "VALIDATION_ERROR");
   }
@@ -237,6 +252,10 @@ function validateReservation(input) {
   if (!isIntegerInRange(input.classNumber, 1, 10)) {
     throw createError("반은 1반부터 10반까지 선택할 수 있습니다.", "VALIDATION_ERROR");
   }
+
+  if (getClassOptionsForGrade(input.grade).indexOf(Number(input.classNumber)) === -1) {
+    throw createError("선택한 학년에 없는 반입니다.", "VALIDATION_ERROR");
+  }
 }
 
 function isIntegerInRange(value, min, max) {
@@ -250,6 +269,27 @@ function isValidGrade(value) {
 
 function normalizeGrade(value) {
   return value === KINDERGARTEN_GRADE ? KINDERGARTEN_GRADE : Number(value);
+}
+
+function getClassOptionsForGrade(grade) {
+  const normalizedGrade = normalizeGrade(grade);
+  return CLASS_OPTIONS_BY_GRADE[String(normalizedGrade)] || CLASS_OPTIONS_BY_GRADE[KINDERGARTEN_GRADE];
+}
+
+function isDateInReservationWindow(dateKey) {
+  const todayKey = formatDateKey(new Date());
+  const maxDate = new Date();
+  maxDate.setDate(maxDate.getDate() + RESERVATION_WINDOW_DAYS);
+  const maxDateKey = formatDateKey(maxDate);
+  return dateKey >= todayKey && dateKey <= maxDateKey;
+}
+
+function formatDateKey(date) {
+  return Utilities.formatDate(date, Session.getScriptTimeZone(), "yyyy-MM-dd");
+}
+
+function getAdminDeletePassword() {
+  return PropertiesService.getScriptProperties().getProperty(ADMIN_DELETE_PASSWORD_PROPERTY) || "";
 }
 
 function formatReservationOwner(reservation) {

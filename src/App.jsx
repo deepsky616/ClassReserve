@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { createReservation, deleteReservation, fetchReservations } from "./api.js";
-import { CLASSES, GRADES, KINDERGARTEN_GRADE, PERIODS, ROOMS, WEEKDAY_LABELS } from "./constants.js";
+import { GRADES, KINDERGARTEN_GRADE, PERIODS, ROOM_TONE_CLASSES, ROOMS, WEEKDAY_LABELS } from "./constants.js";
 import { addWeeks, formatWeekRange, getStartOfWeek, getWeekDays, toDateKey } from "./dateUtils.js";
 import { formatReservationOwner } from "./reservationLabels.js";
+import { getClassOptionsForGrade, getReservationDateRange, normalizeGradeValue } from "./reservationRules.js";
 
 const initialForm = {
   date: toDateKey(new Date()),
@@ -32,7 +33,7 @@ function errorMessage(error, fallback) {
 }
 
 function normalizeGradeForSubmit(grade) {
-  return grade === KINDERGARTEN_GRADE ? KINDERGARTEN_GRADE : Number(grade);
+  return normalizeGradeValue(grade);
 }
 
 function gradeLabel(grade) {
@@ -47,8 +48,13 @@ export default function App() {
   const [message, setMessage] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState("checking");
+  const [viewMode, setViewMode] = useState("table");
 
   const weekDays = useMemo(() => getWeekDays(weekStart), [weekStart]);
+  const todayKey = useMemo(() => toDateKey(new Date()), []);
+  const dateRange = useMemo(() => getReservationDateRange(new Date()), []);
+  const classOptions = useMemo(() => getClassOptionsForGrade(form.grade), [form.grade]);
 
   const visibleReservations = useMemo(() => {
     const weekKeys = new Set(weekDays.map((day) => day.key));
@@ -65,10 +71,13 @@ export default function App() {
 
   async function loadReservations() {
     setLoading(true);
+    setConnectionStatus("checking");
     try {
       setReservations(await fetchReservations());
       setMessage(null);
+      setConnectionStatus("connected");
     } catch (error) {
+      setConnectionStatus("error");
       setMessage({
         type: "error",
         text: errorMessage(error, "예약 목록을 불러오지 못했습니다.")
@@ -79,7 +88,18 @@ export default function App() {
   }
 
   function updateForm(field, value) {
-    setForm((current) => ({ ...current, [field]: value }));
+    setForm((current) => {
+      const next = { ...current, [field]: value };
+
+      if (field === "grade") {
+        const nextClassOptions = getClassOptionsForGrade(value);
+        if (!nextClassOptions.includes(Number(next.classNumber))) {
+          next.classNumber = nextClassOptions[0];
+        }
+      }
+
+      return next;
+    });
   }
 
   async function handleSubmit(event) {
@@ -113,7 +133,7 @@ export default function App() {
   }
 
   async function handleDelete(reservation) {
-    const password = window.prompt(`${reservation.room} ${formatReservationOwner(reservation)} 예약의 삭제 비밀번호를 입력해 주세요.`);
+    const password = window.prompt(`${reservation.room} ${formatReservationOwner(reservation)} 예약의 삭제 비밀번호 또는 관리자 비밀번호를 입력해 주세요.`);
 
     if (!password) {
       return;
@@ -137,6 +157,42 @@ export default function App() {
       .sort((a, b) => a.room.localeCompare(b.room, "ko-KR"));
   }
 
+  function reservationsForDate(date) {
+    return visibleReservations
+      .filter((reservation) => reservation.date === date)
+      .sort((a, b) => {
+        if (a.period !== b.period) {
+          return a.period - b.period;
+        }
+
+        return a.room.localeCompare(b.room, "ko-KR");
+      });
+  }
+
+  function renderReservationItem(reservation) {
+    return (
+      <article className={`reservation-item ${ROOM_TONE_CLASSES[reservation.room] ?? ""}`} key={reservation.id}>
+        <div>
+          <strong>{reservation.room}</strong>
+          <span>{formatReservationOwner(reservation)}</span>
+        </div>
+        <button
+          type="button"
+          className="delete-button"
+          onClick={() => handleDelete(reservation)}
+        >
+          삭제
+        </button>
+      </article>
+    );
+  }
+
+  const connectionLabel = {
+    checking: "연결 확인 중",
+    connected: "구글 시트 연결됨",
+    error: "저장소 연결 오류"
+  }[connectionStatus];
+
   return (
     <main className="app-shell">
       <section className="workspace">
@@ -148,6 +204,7 @@ export default function App() {
           </div>
 
           <div className="week-actions" aria-label="주 이동">
+            <span className={`connection-badge ${connectionStatus}`}>{connectionLabel}</span>
             <button type="button" onClick={() => setWeekStart((date) => addWeeks(date, -1))}>
               이전 주
             </button>
@@ -175,18 +232,35 @@ export default function App() {
                 </select>
               </label>
 
+              <div className="view-toggle" aria-label="보기 방식">
+                <button
+                  type="button"
+                  className={viewMode === "table" ? "active" : ""}
+                  onClick={() => setViewMode("table")}
+                >
+                  시간표
+                </button>
+                <button
+                  type="button"
+                  className={viewMode === "list" ? "active" : ""}
+                  onClick={() => setViewMode("list")}
+                >
+                  날짜별
+                </button>
+              </div>
+
               <button type="button" className="ghost-button" onClick={loadReservations}>
                 새로고침
               </button>
             </div>
 
-            <div className="schedule-scroll">
+            <div className={`schedule-scroll ${viewMode === "table" ? "" : "is-hidden"}`}>
               <table className="schedule-table">
                 <thead>
                   <tr>
                     <th>교시</th>
                     {weekDays.map((day, index) => (
-                      <th key={day.key}>
+                      <th className={day.key === todayKey ? "today-cell" : ""} key={day.key}>
                         <span>{WEEKDAY_LABELS[index]}</span>
                         <strong>{day.label}</strong>
                       </th>
@@ -200,28 +274,14 @@ export default function App() {
                       {weekDays.map((day) => {
                         const dayReservations = reservationsFor(day.key, period);
                         return (
-                          <td key={`${day.key}-${period}`}>
+                          <td className={day.key === todayKey ? "today-cell" : ""} key={`${day.key}-${period}`}>
                             {loading ? (
                               <span className="muted">불러오는 중</span>
                             ) : dayReservations.length === 0 ? (
                               <span className="empty-slot">비어 있음</span>
                             ) : (
                               <div className="reservation-list">
-                                {dayReservations.map((reservation) => (
-                                  <article className="reservation-item" key={reservation.id}>
-                                    <div>
-                                      <strong>{reservation.room}</strong>
-                                      <span>{formatReservationOwner(reservation)}</span>
-                                    </div>
-                                    <button
-                                      type="button"
-                                      className="delete-button"
-                                      onClick={() => handleDelete(reservation)}
-                                    >
-                                      삭제
-                                    </button>
-                                  </article>
-                                ))}
+                                {dayReservations.map(renderReservationItem)}
                               </div>
                             )}
                           </td>
@@ -231,6 +291,34 @@ export default function App() {
                   ))}
                 </tbody>
               </table>
+            </div>
+
+            <div className={`daily-list ${viewMode === "list" ? "" : "is-hidden"}`} aria-label="날짜별 예약 목록">
+              {weekDays.map((day, index) => {
+                const dayReservations = reservationsForDate(day.key);
+                return (
+                  <section className={`daily-column ${day.key === todayKey ? "today-card" : ""}`} key={day.key}>
+                    <h3>
+                      <span>{WEEKDAY_LABELS[index]}</span>
+                      {day.label}
+                    </h3>
+                    {loading ? (
+                      <span className="muted">불러오는 중</span>
+                    ) : dayReservations.length === 0 ? (
+                      <span className="empty-slot">예약 없음</span>
+                    ) : (
+                      <div className="reservation-list">
+                        {dayReservations.map((reservation) => (
+                          <div className="daily-reservation" key={reservation.id}>
+                            <span>{reservation.period}교시</span>
+                            {renderReservationItem(reservation)}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+                );
+              })}
             </div>
           </section>
 
@@ -248,6 +336,8 @@ export default function App() {
                 <input
                   type="date"
                   value={form.date}
+                  min={dateRange.min}
+                  max={dateRange.max}
                   onChange={(event) => updateForm("date", event.target.value)}
                   required
                 />
@@ -292,7 +382,7 @@ export default function App() {
                 <label>
                   반
                   <select value={form.classNumber} onChange={(event) => updateForm("classNumber", event.target.value)}>
-                    {CLASSES.map((classNumber) => (
+                    {classOptions.map((classNumber) => (
                       <option key={classNumber} value={classNumber}>
                         {classNumber}반
                       </option>
