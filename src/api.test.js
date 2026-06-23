@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   createReservation,
   createReservationAndConfirm,
+  createReservationRangeAndConfirm,
   deleteReservation,
   deleteReservationAndConfirm,
   fetchReservations
@@ -243,6 +244,112 @@ test("예약 직전 최신 목록에서 중복을 발견하면 생성 요청을 
   try {
     await assert.rejects(
       () => createReservationAndConfirm(validInput, { scriptUrl: "https://script.google.com/macros/s/example/exec" }),
+      {
+        code: "DUPLICATE_RESERVATION",
+        message: "이미 3학년 4반이 먼저 예약해서 예약할 수 없습니다."
+      }
+    );
+
+    assert.deepEqual(actions, ["list"]);
+  } finally {
+    harness.restore();
+  }
+});
+
+test("교시 범위를 한 번의 JSONP 요청으로 예약하고 목록에서 저장 여부를 확인한다", async () => {
+  const actions = [];
+  let listCallCount = 0;
+  const harness = installJsonpDomHarness((url) => {
+    const payload = JSON.parse(url.searchParams.get("payload"));
+    actions.push(payload.action);
+
+    if (payload.action === "list") {
+      listCallCount += 1;
+      return {
+        ok: true,
+        reservations: listCallCount === 1 ? [] : [1, 2, 3].map((period) => ({
+          id: `reservation-${period}`,
+          date: validInput.date,
+          period,
+          room: validInput.room,
+          grade: validInput.grade,
+          classNumber: validInput.classNumber,
+          createdAt: "2026-06-10T00:00:00.000Z"
+        }))
+      };
+    }
+
+    assert.equal(payload.action, "createMany");
+    assert.deepEqual(payload.reservations.map((reservation) => reservation.period), [1, 2, 3]);
+
+    return {
+      ok: true,
+      reservations: payload.reservations.map((reservation, index) => ({
+        ...reservation,
+        id: `reservation-${index + 1}`,
+        createdAt: "2026-06-10T00:00:00.000Z"
+      }))
+    };
+  });
+
+  try {
+    const result = await createReservationRangeAndConfirm(
+      {
+        ...validInput,
+        startPeriod: 1,
+        endPeriod: 3
+      },
+      { scriptUrl: "https://script.google.com/macros/s/example/exec" }
+    );
+
+    assert.deepEqual(result.createdReservations.map((reservation) => reservation.period), [1, 2, 3]);
+    assert.equal(result.reservations.length, 3);
+    assert.deepEqual(actions, ["list", "createMany", "list"]);
+  } finally {
+    harness.restore();
+  }
+});
+
+test("교시 범위 안에 이미 예약된 교시가 있으면 묶음 생성 요청을 보내지 않는다", async () => {
+  const actions = [];
+  const harness = installJsonpDomHarness((url) => {
+    const payload = JSON.parse(url.searchParams.get("payload"));
+    actions.push(payload.action);
+
+    if (payload.action === "list") {
+      return {
+        ok: true,
+        reservations: [
+          {
+            id: "reservation-1",
+            date: validInput.date,
+            period: 2,
+            room: validInput.room,
+            grade: 3,
+            classNumber: 4,
+            createdAt: "2026-06-10T00:00:00.000Z"
+          }
+        ]
+      };
+    }
+
+    return {
+      ok: false,
+      code: "UNEXPECTED_CREATE",
+      message: "묶음 생성 요청이 호출되면 안 됩니다."
+    };
+  });
+
+  try {
+    await assert.rejects(
+      () => createReservationRangeAndConfirm(
+        {
+          ...validInput,
+          startPeriod: 1,
+          endPeriod: 3
+        },
+        { scriptUrl: "https://script.google.com/macros/s/example/exec" }
+      ),
       {
         code: "DUPLICATE_RESERVATION",
         message: "이미 3학년 4반이 먼저 예약해서 예약할 수 없습니다."

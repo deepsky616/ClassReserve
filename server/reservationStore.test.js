@@ -57,6 +57,34 @@ test("같은 날짜와 교시와 특별실은 중복 예약할 수 없다", asyn
   });
 });
 
+test("여러 교시 예약은 모두 저장되거나 모두 거부된다", async () => {
+  await withStore(async (store) => {
+    const created = await store.createReservations([
+      { ...validInput, period: 1 },
+      { ...validInput, period: 2 },
+      { ...validInput, period: 3 }
+    ]);
+
+    assert.deepEqual(created.map((reservation) => reservation.period), [1, 2, 3]);
+    assert.equal((await store.listReservations()).length, 3);
+
+    await assert.rejects(
+      () => store.createReservations([
+        { ...validInput, date: "2026-06-16", period: 4 },
+        { ...validInput, period: 2 }
+      ]),
+      { code: "DUPLICATE_RESERVATION" }
+    );
+
+    assert.equal((await store.listReservations()).length, 3);
+  }, {
+    id: (() => {
+      let nextId = 1;
+      return () => `reservation-${nextId++}`;
+    })()
+  });
+});
+
 test("중복 예약 오류는 이미 예약한 학년과 반을 알려준다", async () => {
   await withStore(async (store) => {
     await store.createReservation(validInput);

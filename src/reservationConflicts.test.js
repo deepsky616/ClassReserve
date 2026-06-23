@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { findReservationConflict, formatReservationConflictMessage } from "./reservationConflicts.js";
+import {
+  findReservationConflict,
+  findReservationRangeConflict,
+  formatReservationConflictMessage
+} from "./reservationConflicts.js";
 
 const existingReservation = {
   id: "reservation-1",
@@ -31,6 +35,19 @@ test("특별실이 다르면 중복 예약이 아니다", () => {
   });
 
   assert.equal(conflict, null);
+});
+
+test("범위 안의 한 교시라도 겹치면 기존 예약을 찾는다", () => {
+  const conflict = findReservationRangeConflict([existingReservation], {
+    date: "2026-06-19",
+    startPeriod: 1,
+    endPeriod: 3,
+    room: "창의놀이실",
+    grade: 5,
+    classNumber: 1
+  });
+
+  assert.equal(conflict, existingReservation);
 });
 
 test("기존 예약자를 포함한 예약 불가 메시지를 만든다", () => {
