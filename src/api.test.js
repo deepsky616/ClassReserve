@@ -113,37 +113,41 @@ test("JSONP로 예약을 생성한다", async () => {
 });
 
 test("예약 생성 후 목록에서 저장 여부를 확인한다", async () => {
+  const actions = [];
+  let listCallCount = 0;
   const harness = installJsonpDomHarness((url) => {
     const payload = JSON.parse(url.searchParams.get("payload"));
+    actions.push(payload.action);
 
-    if (payload.action === "create") {
+    if (payload.action === "list") {
+      listCallCount += 1;
       return {
         ok: true,
-        reservation: {
-          id: "reservation-2",
-          date: validInput.date,
-          period: validInput.period,
-          room: validInput.room,
-          grade: validInput.grade,
-          classNumber: validInput.classNumber,
-          createdAt: "2026-06-10T00:00:00.000Z"
-        }
+        reservations: listCallCount === 1 ? [] : [
+          {
+            id: "reservation-2",
+            date: validInput.date,
+            period: validInput.period,
+            room: validInput.room,
+            grade: validInput.grade,
+            classNumber: validInput.classNumber,
+            createdAt: "2026-06-10T00:00:00.000Z"
+          }
+        ]
       };
     }
 
     return {
       ok: true,
-      reservations: [
-        {
-          id: "reservation-2",
-          date: validInput.date,
-          period: validInput.period,
-          room: validInput.room,
-          grade: validInput.grade,
-          classNumber: validInput.classNumber,
-          createdAt: "2026-06-10T00:00:00.000Z"
-        }
-      ]
+      reservation: {
+        id: "reservation-2",
+        date: validInput.date,
+        period: validInput.period,
+        room: validInput.room,
+        grade: validInput.grade,
+        classNumber: validInput.classNumber,
+        createdAt: "2026-06-10T00:00:00.000Z"
+      }
     };
   });
 
@@ -154,33 +158,36 @@ test("예약 생성 후 목록에서 저장 여부를 확인한다", async () =>
 
     assert.equal(result.reservation.id, "reservation-2");
     assert.equal(result.reservations.length, 1);
+    assert.deepEqual(actions, ["list", "create", "list"]);
   } finally {
     harness.restore();
   }
 });
 
 test("생성 응답은 성공이지만 목록에 없으면 저장 확인 실패로 분류한다", async () => {
+  let listCallCount = 0;
   const harness = installJsonpDomHarness((url) => {
     const payload = JSON.parse(url.searchParams.get("payload"));
 
-    if (payload.action === "create") {
+    if (payload.action === "list") {
+      listCallCount += 1;
       return {
         ok: true,
-        reservation: {
-          id: "reservation-2",
-          date: validInput.date,
-          period: validInput.period,
-          room: validInput.room,
-          grade: validInput.grade,
-          classNumber: validInput.classNumber,
-          createdAt: "2026-06-10T00:00:00.000Z"
-        }
+        reservations: listCallCount === 1 ? [] : []
       };
     }
 
     return {
       ok: true,
-      reservations: []
+      reservation: {
+        id: "reservation-2",
+        date: validInput.date,
+        period: validInput.period,
+        room: validInput.room,
+        grade: validInput.grade,
+        classNumber: validInput.classNumber,
+        createdAt: "2026-06-10T00:00:00.000Z"
+      }
     };
   });
 
@@ -192,6 +199,51 @@ test("생성 응답은 성공이지만 목록에 없으면 저장 확인 실패�
         message: "예약 저장을 확인하지 못했습니다. 저장소 배포 상태를 확인해 주세요."
       }
     );
+  } finally {
+    harness.restore();
+  }
+});
+
+test("예약 직전 최신 목록에서 중복을 발견하면 생성 요청을 보내지 않는다", async () => {
+  const actions = [];
+  const harness = installJsonpDomHarness((url) => {
+    const payload = JSON.parse(url.searchParams.get("payload"));
+    actions.push(payload.action);
+
+    if (payload.action === "list") {
+      return {
+        ok: true,
+        reservations: [
+          {
+            id: "reservation-1",
+            date: validInput.date,
+            period: validInput.period,
+            room: validInput.room,
+            grade: 3,
+            classNumber: 4,
+            createdAt: "2026-06-10T00:00:00.000Z"
+          }
+        ]
+      };
+    }
+
+    return {
+      ok: false,
+      code: "UNEXPECTED_CREATE",
+      message: "생성 요청이 호출되면 안 됩니다."
+    };
+  });
+
+  try {
+    await assert.rejects(
+      () => createReservationAndConfirm(validInput, { scriptUrl: "https://script.google.com/macros/s/example/exec" }),
+      {
+        code: "DUPLICATE_RESERVATION",
+        message: "이미 3학년 4반이 먼저 예약해서 예약할 수 없습니다."
+      }
+    );
+
+    assert.deepEqual(actions, ["list"]);
   } finally {
     harness.restore();
   }
