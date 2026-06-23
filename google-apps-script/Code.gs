@@ -55,6 +55,13 @@ function handleAction(payload) {
     };
   }
 
+  if (payload.action === "createMany") {
+    return {
+      ok: true,
+      reservations: createReservations(payload.reservations)
+    };
+  }
+
   if (payload.action === "delete") {
     deleteReservation(payload.id, payload.password);
     return {
@@ -73,7 +80,15 @@ function listReservations() {
 }
 
 function createReservation(input) {
-  validateReservation(input);
+  return createReservations([input])[0];
+}
+
+function createReservations(inputs) {
+  if (!Array.isArray(inputs) || inputs.length === 0) {
+    throw createError("예약 내용이 없습니다.", "VALIDATION_ERROR");
+  }
+
+  inputs.forEach(validateReservation);
 
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
@@ -81,34 +96,38 @@ function createReservation(input) {
   try {
     const sheet = getReservationSheet();
     const rows = readRows(sheet);
-    const duplicate = rows.find(function (reservation) {
-      return (
-        reservation.date === input.date &&
-        Number(reservation.period) === Number(input.period) &&
-        reservation.room === input.room
-      );
+    const createdAt = new Date().toISOString();
+    const createdReservations = [];
+
+    inputs.forEach(function (input) {
+      const duplicate = rows.concat(createdReservations).find(function (reservation) {
+        return isSameSlot(reservation, input);
+      });
+
+      if (duplicate) {
+        throw createError("이미 " + formatReservationOwner(duplicate) + "이 먼저 예약해서 예약할 수 없습니다.", "DUPLICATE_RESERVATION");
+      }
+
+      createdReservations.push({
+        id: Utilities.getUuid(),
+        date: input.date,
+        period: Number(input.period),
+        room: input.room,
+        grade: normalizeGrade(input.grade),
+        classNumber: normalizeClassNumber(input.grade, input.classNumber),
+        passwordHash: hashPassword(input.password),
+        createdAt: createdAt
+      });
     });
 
-    if (duplicate) {
-      throw createError("이미 " + formatReservationOwner(duplicate) + "이 먼저 예약해서 예약할 수 없습니다.", "DUPLICATE_RESERVATION");
-    }
+    sheet.getRange(sheet.getLastRow() + 1, 1, createdReservations.length, HEADER.length)
+      .setValues(createdReservations.map(function (reservation) {
+        return HEADER.map(function (key) {
+          return reservation[key];
+        });
+      }));
 
-    const reservation = {
-      id: Utilities.getUuid(),
-      date: input.date,
-      period: Number(input.period),
-      room: input.room,
-      grade: normalizeGrade(input.grade),
-      classNumber: normalizeClassNumber(input.grade, input.classNumber),
-      passwordHash: hashPassword(input.password),
-      createdAt: new Date().toISOString()
-    };
-
-    sheet.appendRow(HEADER.map(function (key) {
-      return reservation[key];
-    }));
-
-    return toPublicReservation(reservation);
+    return createdReservations.map(toPublicReservation);
   } finally {
     lock.releaseLock();
   }
@@ -286,6 +305,14 @@ function isIntegerInRange(value, min, max) {
 
 function isValidGrade(value) {
   return value === KINDERGARTEN_GRADE || isIntegerInRange(value, 1, 6);
+}
+
+function isSameSlot(reservation, input) {
+  return (
+    reservation.date === input.date &&
+    Number(reservation.period) === Number(input.period) &&
+    reservation.room === input.room
+  );
 }
 
 function isKindergartenGrade(value) {

@@ -47,38 +47,48 @@ export function createReservationStore(options = {}) {
   }
 
   async function createReservation(input) {
-    validateReservationInput(input, new Date(now()));
-    const reservations = await readReservations();
-    const duplicate = reservations.find((reservation) => {
-      return (
-        reservation.date === input.date &&
-        Number(reservation.period) === Number(input.period) &&
-        reservation.room === input.room
-      );
-    });
+    const reservations = await createReservations([input]);
+    return reservations[0];
+  }
 
-    if (duplicate) {
-      throw createError(
-        `이미 ${formatReservationOwner(duplicate)}이 먼저 예약해서 예약할 수 없습니다.`,
-        "DUPLICATE_RESERVATION",
-        409,
-        { conflictReservation: stripPrivateFields(duplicate) }
-      );
+  async function createReservations(inputs) {
+    if (!Array.isArray(inputs) || inputs.length === 0) {
+      throw createError("예약 내용이 없습니다.", "VALIDATION_ERROR", 400);
     }
 
-    const reservation = {
-      id: id(),
-      date: input.date,
-      period: Number(input.period),
-      room: input.room,
-      grade: normalizeGradeValue(input.grade),
-      classNumber: normalizeClassNumberValue(input.grade, input.classNumber),
-      passwordHash: createPasswordHash(input.password),
-      createdAt: now()
-    };
+    const createdAt = now();
+    const baseDate = new Date(createdAt);
+    inputs.forEach((input) => validateReservationInput(input, baseDate));
 
-    await writeReservations([...reservations, reservation]);
-    return stripPrivateFields(reservation);
+    const reservations = await readReservations();
+    const createdReservations = [];
+
+    for (const input of inputs) {
+      const duplicate = [...reservations, ...createdReservations].find((reservation) => isSameSlot(reservation, input));
+
+      if (duplicate) {
+        throw createError(
+          `이미 ${formatReservationOwner(duplicate)}이 먼저 예약해서 예약할 수 없습니다.`,
+          "DUPLICATE_RESERVATION",
+          409,
+          { conflictReservation: stripPrivateFields(duplicate) }
+        );
+      }
+
+      createdReservations.push({
+        id: id(),
+        date: input.date,
+        period: Number(input.period),
+        room: input.room,
+        grade: normalizeGradeValue(input.grade),
+        classNumber: normalizeClassNumberValue(input.grade, input.classNumber),
+        passwordHash: createPasswordHash(input.password),
+        createdAt
+      });
+    }
+
+    await writeReservations([...reservations, ...createdReservations]);
+    return createdReservations.map(stripPrivateFields);
   }
 
   async function deleteReservation(reservationId, password) {
@@ -104,6 +114,7 @@ export function createReservationStore(options = {}) {
   return {
     listReservations,
     createReservation,
+    createReservations,
     deleteReservation
   };
 }
@@ -167,6 +178,14 @@ function isNumberInRange(value, min, max) {
 
 function isValidGrade(value) {
   return value === KINDERGARTEN_GRADE || isNumberInRange(value, 1, 6);
+}
+
+function isSameSlot(reservation, input) {
+  return (
+    reservation.date === input.date &&
+    Number(reservation.period) === Number(input.period) &&
+    reservation.room === input.room
+  );
 }
 
 function formatReservationOwner(reservation) {

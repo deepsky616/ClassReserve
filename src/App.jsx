@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { createReservationAndConfirm, deleteReservationAndConfirm, fetchReservations } from "./api.js";
+import { createReservationRangeAndConfirm, deleteReservationAndConfirm, fetchReservations } from "./api.js";
 import { GRADES, KINDERGARTEN_GRADE, PERIODS, ROOM_TONE_CLASSES, ROOMS, WEEKDAY_LABELS } from "./constants.js";
 import { addWeeks, formatWeekRange, getStartOfWeek, getWeekDays, toDateKey } from "./dateUtils.js";
+import { getPeriodRange, getPeriodRangeLabel } from "./periodRange.js";
 import { formatReservationOwner } from "./reservationLabels.js";
 import { getDuplicateReservationGroups, getDuplicateReservationsToDelete } from "./reservationCleanup.js";
 import {
@@ -11,11 +12,12 @@ import {
   normalizeClassNumberValue,
   normalizeGradeValue
 } from "./reservationRules.js";
-import { findReservationConflict, formatReservationConflictMessage } from "./reservationConflicts.js";
+import { findReservationRangeConflict, formatReservationConflictMessage } from "./reservationConflicts.js";
 
 const initialForm = {
   date: toDateKey(new Date()),
-  period: 1,
+  startPeriod: 1,
+  endPeriod: 1,
   room: ROOMS[0],
   grade: 1,
   classNumber: 1,
@@ -69,6 +71,7 @@ export default function App() {
   const isKindergarten = isKindergartenGrade(form.grade);
   const duplicateGroups = useMemo(() => getDuplicateReservationGroups(reservations), [reservations]);
   const duplicateReservations = useMemo(() => getDuplicateReservationsToDelete(reservations), [reservations]);
+  const selectedPeriods = useMemo(() => getPeriodRange(form.startPeriod, form.endPeriod), [form.startPeriod, form.endPeriod]);
 
   const visibleReservations = useMemo(() => {
     const weekKeys = new Set(weekDays.map((day) => day.key));
@@ -114,6 +117,14 @@ export default function App() {
         }
       }
 
+      if (field === "startPeriod" && Number(next.endPeriod) < Number(value)) {
+        next.endPeriod = Number(value);
+      }
+
+      if (field === "endPeriod" && Number(value) < Number(next.startPeriod)) {
+        next.startPeriod = Number(value);
+      }
+
       return next;
     });
   }
@@ -130,21 +141,22 @@ export default function App() {
     try {
       const reservationInput = {
         ...form,
-        period: Number(form.period),
+        startPeriod: Number(form.startPeriod),
+        endPeriod: Number(form.endPeriod),
         grade: normalizeGradeForSubmit(form.grade),
         classNumber: normalizeClassNumberValue(form.grade, form.classNumber),
         password: form.password.trim()
       };
-      const conflict = findReservationConflict(reservations, reservationInput);
+      const conflict = findReservationRangeConflict(reservations, reservationInput);
 
       if (conflict) {
         setMessage({ type: "error", text: formatReservationConflictMessage(conflict) });
         return;
       }
 
-      const result = await createReservationAndConfirm(reservationInput);
+      const result = await createReservationRangeAndConfirm(reservationInput);
       setReservations(result.reservations);
-      setMessage({ type: "success", text: "예약되었습니다." });
+      setMessage({ type: "success", text: `${getPeriodRangeLabel(selectedPeriods)} 예약되었습니다.` });
       setForm((current) => ({ ...current, password: "" }));
     } catch (error) {
       setMessage({
@@ -408,8 +420,8 @@ export default function App() {
 
               <div className="form-row">
                 <label>
-                  교시
-                  <select value={form.period} onChange={(event) => updateForm("period", event.target.value)}>
+                  시작 교시
+                  <select value={form.startPeriod} onChange={(event) => updateForm("startPeriod", event.target.value)}>
                     {PERIODS.map((period) => (
                       <option key={period} value={period}>
                         {period}교시
@@ -419,16 +431,27 @@ export default function App() {
                 </label>
 
                 <label>
-                  특별실
-                  <select value={form.room} onChange={(event) => updateForm("room", event.target.value)}>
-                    {ROOMS.map((room) => (
-                      <option key={room} value={room}>
-                        {room}
+                  끝 교시
+                  <select value={form.endPeriod} onChange={(event) => updateForm("endPeriod", event.target.value)}>
+                    {PERIODS.filter((period) => period >= Number(form.startPeriod)).map((period) => (
+                      <option key={period} value={period}>
+                        {period}교시
                       </option>
                     ))}
                   </select>
                 </label>
               </div>
+
+              <label>
+                특별실
+                <select value={form.room} onChange={(event) => updateForm("room", event.target.value)}>
+                  {ROOMS.map((room) => (
+                    <option key={room} value={room}>
+                      {room}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
               <div className="form-row">
                 <label>

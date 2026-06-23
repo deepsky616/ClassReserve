@@ -1,5 +1,10 @@
 import { toDateKey } from "./dateUtils.js";
-import { findReservationConflict, formatReservationConflictMessage } from "./reservationConflicts.js";
+import {
+  findReservationConflict,
+  findReservationRangeConflict,
+  formatReservationConflictMessage
+} from "./reservationConflicts.js";
+import { getPeriodRange } from "./periodRange.js";
 
 const DEFAULT_TIMEOUT_MS = 15000;
 
@@ -112,6 +117,17 @@ export async function createReservation(input, options) {
   return normalizeReservation(body.reservation);
 }
 
+export async function createReservations(inputs, options) {
+  const body = await callGoogleScript(
+    {
+      action: "createMany",
+      reservations: inputs
+    },
+    options
+  );
+  return body.reservations.map(normalizeReservation);
+}
+
 export async function createReservationAndConfirm(input, options) {
   const latestReservations = await fetchReservations(options);
   const conflict = findReservationConflict(latestReservations, input);
@@ -135,6 +151,44 @@ export async function createReservationAndConfirm(input, options) {
 
   return {
     reservation,
+    reservations
+  };
+}
+
+export async function createReservationRangeAndConfirm(input, options) {
+  const periods = getPeriodRange(input.startPeriod, input.endPeriod);
+  const reservationInputs = periods.map((period) => {
+    const { startPeriod, endPeriod, ...reservationInput } = input;
+    return {
+      ...reservationInput,
+      period
+    };
+  });
+  const latestReservations = await fetchReservations(options);
+  const conflict = findReservationRangeConflict(latestReservations, input);
+
+  if (conflict) {
+    throw createClientError(
+      formatReservationConflictMessage(conflict),
+      "DUPLICATE_RESERVATION"
+    );
+  }
+
+  const createdReservations = await createReservations(reservationInputs, options);
+  const reservations = await fetchReservations(options);
+  const hasUnconfirmedReservation = createdReservations.some((reservation) => {
+    return !isPersistedReservation(reservation, reservations);
+  });
+
+  if (hasUnconfirmedReservation) {
+    throw createClientError(
+      "예약 저장을 확인하지 못했습니다. 저장소 배포 상태를 확인해 주세요.",
+      "PERSISTENCE_UNCONFIRMED"
+    );
+  }
+
+  return {
+    createdReservations,
     reservations
   };
 }

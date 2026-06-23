@@ -1,4 +1,5 @@
 import { formatReservationOwner } from "./reservationLabels.js";
+import { getPeriodRange } from "./periodRange.js";
 
 export function findReservationConflict(reservations, input) {
   return reservations.find((reservation) => {
@@ -8,6 +9,13 @@ export function findReservationConflict(reservations, input) {
       reservation.room === input.room
     );
   }) ?? null;
+}
+
+export function findReservationRangeConflict(reservations, input) {
+  const periods = getPeriodRange(input.startPeriod, input.endPeriod);
+  return periods
+    .map((period) => findReservationConflict(reservations, { ...input, period }))
+    .find(Boolean) ?? null;
 }
 
 export function formatReservationConflictMessage(reservation) {

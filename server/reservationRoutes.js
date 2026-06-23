@@ -24,6 +24,15 @@ export function createReservationApp({ store }) {
     }
   });
 
+  app.post("/api/reservations/batch", async (request, response, next) => {
+    try {
+      const reservations = await store.createReservations(request.body?.reservations);
+      response.status(201).json({ reservations });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   app.delete("/api/reservations/:id", async (request, response, next) => {
     try {
       const result = await store.deleteReservation(request.params.id, request.body?.password);
