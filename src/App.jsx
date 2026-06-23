@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { createReservationAndConfirm, deleteReservation, fetchReservations } from "./api.js";
+import { createReservationAndConfirm, deleteReservationAndConfirm, fetchReservations } from "./api.js";
 import { GRADES, KINDERGARTEN_GRADE, PERIODS, ROOM_TONE_CLASSES, ROOMS, WEEKDAY_LABELS } from "./constants.js";
 import { addWeeks, formatWeekRange, getStartOfWeek, getWeekDays, toDateKey } from "./dateUtils.js";
 import { formatReservationOwner } from "./reservationLabels.js";
+import { getDuplicateReservationGroups, getDuplicateReservationsToDelete } from "./reservationCleanup.js";
 import {
   getClassOptionsForGrade,
   getReservationDateRange,
@@ -29,7 +30,8 @@ const messageByCode = {
   CONFIG_MISSING: "구글 앱스 스크립트 주소가 설정되지 않았습니다.",
   GOOGLE_SCRIPT_UNAVAILABLE: "구글 시트 저장소에 연결할 수 없습니다.",
   GOOGLE_SCRIPT_ERROR: "구글 시트 저장소 요청을 처리하지 못했습니다.",
-  PERSISTENCE_UNCONFIRMED: "예약 저장을 확인하지 못했습니다. 저장소 배포 상태를 확인해 주세요."
+  PERSISTENCE_UNCONFIRMED: "예약 저장을 확인하지 못했습니다. 저장소 배포 상태를 확인해 주세요.",
+  DELETE_UNCONFIRMED: "예약 삭제를 확인하지 못했습니다. 저장소 배포 상태를 확인해 주세요."
 };
 
 function errorMessage(error, fallback) {
@@ -56,6 +58,7 @@ export default function App() {
   const [message, setMessage] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [cleaningDuplicates, setCleaningDuplicates] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState("checking");
   const [viewMode, setViewMode] = useState("table");
 
@@ -64,6 +67,8 @@ export default function App() {
   const dateRange = useMemo(() => getReservationDateRange(new Date()), []);
   const classOptions = useMemo(() => getClassOptionsForGrade(form.grade), [form.grade]);
   const isKindergarten = isKindergartenGrade(form.grade);
+  const duplicateGroups = useMemo(() => getDuplicateReservationGroups(reservations), [reservations]);
+  const duplicateReservations = useMemo(() => getDuplicateReservationsToDelete(reservations), [reservations]);
 
   const visibleReservations = useMemo(() => {
     const weekKeys = new Set(weekDays.map((day) => day.key));
@@ -159,14 +164,53 @@ export default function App() {
     }
 
     try {
-      await deleteReservation(reservation.id, password);
-      setReservations((current) => current.filter((item) => item.id !== reservation.id));
+      const result = await deleteReservationAndConfirm(reservation.id, password);
+      setReservations(result.reservations);
       setMessage({ type: "success", text: "예약을 삭제했습니다." });
     } catch (error) {
       setMessage({
         type: "error",
         text: errorMessage(error, "예약을 삭제하지 못했습니다.")
       });
+    }
+  }
+
+  async function handleCleanupDuplicates() {
+    if (duplicateReservations.length === 0) {
+      setMessage({ type: "success", text: "정리할 중복 예약이 없습니다." });
+      return;
+    }
+
+    const password = window.prompt("중복 예약 삭제를 위한 관리자 비밀번호를 입력해 주세요.");
+
+    if (!password) {
+      return;
+    }
+
+    const shouldDelete = window.confirm(`먼저 예약한 것만 남기고 중복 예약 ${duplicateReservations.length}건을 삭제할까요?`);
+
+    if (!shouldDelete) {
+      return;
+    }
+
+    setCleaningDuplicates(true);
+    try {
+      let latestReservations = reservations;
+
+      for (const reservation of duplicateReservations) {
+        const result = await deleteReservationAndConfirm(reservation.id, password);
+        latestReservations = result.reservations;
+      }
+
+      setReservations(latestReservations);
+      setMessage({ type: "success", text: `중복 예약 ${duplicateReservations.length}건을 정리했습니다.` });
+    } catch (error) {
+      setMessage({
+        type: "error",
+        text: errorMessage(error, "중복 예약을 정리하지 못했습니다.")
+      });
+    } finally {
+      setCleaningDuplicates(false);
     }
   }
 
@@ -427,6 +471,34 @@ export default function App() {
                 {saving ? "저장 중" : "예약하기"}
               </button>
             </form>
+
+            <section className="admin-panel" aria-label="중복 예약 정리">
+              <div>
+                <p className="eyebrow">관리 도구</p>
+                <h2>중복 정리</h2>
+              </div>
+
+              {duplicateGroups.length === 0 ? (
+                <p className="duplicate-summary">중복 예약 없음</p>
+              ) : (
+                <div className="duplicate-summary warning">
+                  <strong>중복 {duplicateGroups.length}묶음</strong>
+                  <span>삭제 후보 {duplicateReservations.length}건</span>
+                  <span>
+                    첫 예약만 남기고 나머지를 삭제합니다.
+                  </span>
+                </div>
+              )}
+
+              <button
+                type="button"
+                className="cleanup-button"
+                disabled={cleaningDuplicates || duplicateReservations.length === 0}
+                onClick={handleCleanupDuplicates}
+              >
+                {cleaningDuplicates ? "정리 중" : "중복 정리"}
+              </button>
+            </section>
           </aside>
         </div>
       </section>

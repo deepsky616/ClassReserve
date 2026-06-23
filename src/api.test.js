@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createReservation, createReservationAndConfirm, deleteReservation, fetchReservations } from "./api.js";
+import {
+  createReservation,
+  createReservationAndConfirm,
+  deleteReservation,
+  deleteReservationAndConfirm,
+  fetchReservations
+} from "./api.js";
 
 const validInput = {
   date: "2026-06-19",
@@ -286,6 +292,90 @@ test("JSONP로 예약을 삭제한다", async () => {
     assert.equal(payload.id, "reservation-2");
     assert.equal(payload.password, "12");
     assert.equal(result.deleted, true);
+  } finally {
+    harness.restore();
+  }
+});
+
+test("예약 삭제 후 목록에서 실제 삭제 여부를 확인한다", async () => {
+  const actions = [];
+  const harness = installJsonpDomHarness((url) => {
+    const payload = JSON.parse(url.searchParams.get("payload"));
+    actions.push(payload.action);
+
+    if (payload.action === "list") {
+      return {
+        ok: true,
+        reservations: [
+          {
+            id: "reservation-1",
+            date: validInput.date,
+            period: validInput.period,
+            room: validInput.room,
+            grade: validInput.grade,
+            classNumber: validInput.classNumber,
+            createdAt: "2026-06-10T00:00:00.000Z"
+          }
+        ]
+      };
+    }
+
+    return {
+      ok: true,
+      deleted: true
+    };
+  });
+
+  try {
+    const result = await deleteReservationAndConfirm("reservation-2", "12", {
+      scriptUrl: "https://script.google.com/macros/s/example/exec"
+    });
+
+    assert.equal(result.deleted, true);
+    assert.equal(result.reservations.length, 1);
+    assert.deepEqual(actions, ["delete", "list"]);
+  } finally {
+    harness.restore();
+  }
+});
+
+test("삭제 응답은 성공이지만 목록에 남아 있으면 삭제 확인 실패로 분류한다", async () => {
+  const harness = installJsonpDomHarness((url) => {
+    const payload = JSON.parse(url.searchParams.get("payload"));
+
+    if (payload.action === "list") {
+      return {
+        ok: true,
+        reservations: [
+          {
+            id: "reservation-2",
+            date: validInput.date,
+            period: validInput.period,
+            room: validInput.room,
+            grade: validInput.grade,
+            classNumber: validInput.classNumber,
+            createdAt: "2026-06-10T00:00:00.000Z"
+          }
+        ]
+      };
+    }
+
+    return {
+      ok: true,
+      deleted: true
+    };
+  });
+
+  try {
+    await assert.rejects(
+      () => deleteReservationAndConfirm("reservation-2", "12", {
+        scriptUrl: "https://script.google.com/macros/s/example/exec"
+      }),
+      {
+        code: "DELETE_UNCONFIRMED",
+        message: "예약 삭제를 확인하지 못했습니다. 저장소 배포 상태를 확인해 주세요."
+      }
+    );
   } finally {
     harness.restore();
   }

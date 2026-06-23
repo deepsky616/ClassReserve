@@ -149,3 +149,21 @@ export async function deleteReservation(id, password, options) {
     options
   );
 }
+
+export async function deleteReservationAndConfirm(id, password, options) {
+  await deleteReservation(id, password, options);
+  const reservations = await fetchReservations(options);
+  const stillExists = reservations.some((reservation) => reservation.id === id);
+
+  if (stillExists) {
+    throw createClientError(
+      "예약 삭제를 확인하지 못했습니다. 저장소 배포 상태를 확인해 주세요.",
+      "DELETE_UNCONFIRMED"
+    );
+  }
+
+  return {
+    deleted: true,
+    reservations
+  };
+}

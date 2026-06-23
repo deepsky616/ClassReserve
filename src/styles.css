@@ -453,6 +453,48 @@ form {
   background: var(--accent-strong);
 }
 
+.admin-panel {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+  padding-top: 18px;
+}
+
+.admin-panel h2 {
+  font-size: 18px;
+}
+
+.duplicate-summary {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--subtle);
+  display: grid;
+  font-size: 13px;
+  font-weight: 800;
+  gap: 4px;
+  margin: 0;
+  padding: 10px;
+}
+
+.duplicate-summary.warning {
+  background: var(--warning-soft);
+  border-color: rgba(181, 71, 8, 0.28);
+  color: var(--warning);
+}
+
+.duplicate-summary strong,
+.duplicate-summary span {
+  display: block;
+}
+
+.cleanup-button {
+  color: var(--warning);
+  font-weight: 900;
+  width: 100%;
+}
+
 @media (max-width: 980px) {
   .app-shell {
     padding: 16px;
