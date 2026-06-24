@@ -1,10 +1,5 @@
 import { toDateKey } from "./dateUtils.js";
 import { normalizeRoomName } from "./roomUtils.js";
-import {
-  findReservationConflict,
-  findReservationRangeConflict,
-  formatReservationConflictMessage
-} from "./reservationConflicts.js";
 import { getPeriodRange } from "./periodRange.js";
 
 const DEFAULT_TIMEOUT_MS = 15000;
@@ -130,30 +125,43 @@ export async function createReservations(inputs, options) {
   return body.reservations.map(normalizeReservation);
 }
 
-export async function createReservationAndConfirm(input, options) {
-  const latestReservations = await fetchReservations(options);
-  const conflict = findReservationConflict(latestReservations, input);
+export async function createReservationsAndList(inputs, options) {
+  const body = await callGoogleScript(
+    {
+      action: "createManyAndList",
+      reservations: inputs
+    },
+    options
+  );
 
-  if (conflict) {
-    throw createClientError(
-      formatReservationConflictMessage(conflict),
-      "DUPLICATE_RESERVATION"
-    );
-  }
+  return {
+    createdReservations: body.createdReservations.map(normalizeReservation),
+    reservations: body.reservations.map(normalizeReservation)
+  };
+}
 
-  const reservation = await createReservation(input, options);
-  const reservations = await fetchReservations(options);
+function confirmCreatedReservations(createdReservations, reservations) {
+  const hasUnconfirmedReservation = createdReservations.some((reservation) => {
+    return !reservation || !isPersistedReservation(reservation, reservations);
+  });
 
-  if (!isPersistedReservation(reservation, reservations)) {
+  if (hasUnconfirmedReservation) {
     throw createClientError(
       "예약 저장을 확인하지 못했습니다. 저장소 배포 상태를 확인해 주세요.",
       "PERSISTENCE_UNCONFIRMED"
     );
   }
+}
+
+export async function createReservationAndConfirm(input, options) {
+  const result = await createReservationsAndList([input], options);
+  const reservation = result.createdReservations[0];
+
+  confirmCreatedReservations([reservation], result.reservations);
 
   return {
     reservation,
-    reservations
+    reservations: result.reservations
   };
 }
 
@@ -166,32 +174,12 @@ export async function createReservationRangeAndConfirm(input, options) {
       period
     };
   });
-  const latestReservations = await fetchReservations(options);
-  const conflict = findReservationRangeConflict(latestReservations, input);
-
-  if (conflict) {
-    throw createClientError(
-      formatReservationConflictMessage(conflict),
-      "DUPLICATE_RESERVATION"
-    );
-  }
-
-  const createdReservations = await createReservations(reservationInputs, options);
-  const reservations = await fetchReservations(options);
-  const hasUnconfirmedReservation = createdReservations.some((reservation) => {
-    return !isPersistedReservation(reservation, reservations);
-  });
-
-  if (hasUnconfirmedReservation) {
-    throw createClientError(
-      "예약 저장을 확인하지 못했습니다. 저장소 배포 상태를 확인해 주세요.",
-      "PERSISTENCE_UNCONFIRMED"
-    );
-  }
+  const result = await createReservationsAndList(reservationInputs, options);
+  confirmCreatedReservations(result.createdReservations, result.reservations);
 
   return {
-    createdReservations,
-    reservations
+    createdReservations: result.createdReservations,
+    reservations: result.reservations
   };
 }
 
@@ -207,8 +195,8 @@ export async function deleteReservation(id, password, options) {
 }
 
 export async function deleteReservationAndConfirm(id, password, options) {
-  await deleteReservation(id, password, options);
-  const reservations = await fetchReservations(options);
+  const result = await deleteReservationsAndList([id], password, options);
+  const reservations = result.reservations;
   const stillExists = reservations.some((reservation) => reservation.id === id);
 
   if (stillExists) {
@@ -225,11 +213,8 @@ export async function deleteReservationAndConfirm(id, password, options) {
 }
 
 export async function deleteReservationsAndConfirm(ids, password, options) {
-  for (const id of ids) {
-    await deleteReservation(id, password, options);
-  }
-
-  const reservations = await fetchReservations(options);
+  const result = await deleteReservationsAndList(ids, password, options);
+  const reservations = result.reservations;
   const deletedIds = new Set(ids);
   const stillExists = reservations.some((reservation) => deletedIds.has(reservation.id));
 
@@ -242,7 +227,24 @@ export async function deleteReservationsAndConfirm(ids, password, options) {
 
   return {
     deleted: true,
-    deletedCount: ids.length,
+    deletedCount: result.deletedCount,
     reservations
+  };
+}
+
+export async function deleteReservationsAndList(ids, password, options) {
+  const body = await callGoogleScript(
+    {
+      action: "deleteManyAndList",
+      ids,
+      password
+    },
+    options
+  );
+
+  return {
+    deleted: true,
+    deletedCount: body.deletedCount,
+    reservations: body.reservations.map(normalizeReservation)
   };
 }

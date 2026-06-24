@@ -65,12 +65,20 @@ function handleAction(payload) {
     };
   }
 
+  if (payload.action === "createManyAndList") {
+    return createManyAndList(payload.reservations);
+  }
+
   if (payload.action === "delete") {
     deleteReservation(payload.id, payload.password);
     return {
       ok: true,
       deleted: true
     };
+  }
+
+  if (payload.action === "deleteManyAndList") {
+    return deleteManyAndList(payload.ids, payload.password);
   }
 
   throw createError("지원하지 않는 요청입니다.", "VALIDATION_ERROR");
@@ -84,6 +92,16 @@ function listReservations() {
 
 function createReservation(input) {
   return createReservations([input])[0];
+}
+
+function createManyAndList(inputs) {
+  const createdReservations = createReservations(inputs);
+
+  return {
+    ok: true,
+    createdReservations: createdReservations,
+    reservations: listReservations()
+  };
 }
 
 function createReservations(inputs) {
@@ -137,7 +155,34 @@ function createReservations(inputs) {
 }
 
 function deleteReservation(id, password) {
-  if (!id || !password) {
+  deleteReservations([id], password);
+}
+
+function deleteManyAndList(ids, password) {
+  const result = deleteReservations(ids, password);
+
+  return {
+    ok: true,
+    deleted: true,
+    deletedCount: result.deletedCount,
+    reservations: listReservations()
+  };
+}
+
+function deleteReservations(ids, password) {
+  if (!Array.isArray(ids) || ids.length === 0 || !password) {
+    throw createError("예약과 비밀번호를 확인해 주세요.", "VALIDATION_ERROR");
+  }
+
+  const targetIds = [];
+  ids.forEach(function (id) {
+    const value = String(id);
+    if (value && targetIds.indexOf(value) === -1) {
+      targetIds.push(value);
+    }
+  });
+
+  if (targetIds.length === 0) {
     throw createError("예약과 비밀번호를 확인해 주세요.", "VALIDATION_ERROR");
   }
 
@@ -147,22 +192,43 @@ function deleteReservation(id, password) {
   try {
     const sheet = getReservationSheet();
     const values = sheet.getDataRange().getValues();
+    const rowsToDelete = [];
 
-    for (let rowIndex = 1; rowIndex < values.length; rowIndex += 1) {
-      const row = values[rowIndex];
-      const reservation = rowToReservation(row);
+    targetIds.forEach(function (id) {
+      let matchedRowNumber = null;
+      let matchedReservation = null;
 
-      if (reservation.id === id) {
-        if (reservation.passwordHash !== hashPassword(password) && password !== getAdminDeletePassword()) {
-          throw createError("삭제 비밀번호가 맞지 않습니다.", "INVALID_PASSWORD");
+      for (let rowIndex = 1; rowIndex < values.length; rowIndex += 1) {
+        const row = values[rowIndex];
+        const reservation = rowToReservation(row);
+
+        if (reservation.id === id) {
+          matchedRowNumber = rowIndex + 1;
+          matchedReservation = reservation;
+          break;
         }
-
-        sheet.deleteRow(rowIndex + 1);
-        return;
       }
-    }
 
-    throw createError("예약을 찾을 수 없습니다.", "NOT_FOUND");
+      if (!matchedReservation) {
+        throw createError("예약을 찾을 수 없습니다.", "NOT_FOUND");
+      }
+
+      if (matchedReservation.passwordHash !== hashPassword(password) && password !== getAdminDeletePassword()) {
+        throw createError("삭제 비밀번호가 맞지 않습니다.", "INVALID_PASSWORD");
+      }
+
+      rowsToDelete.push(matchedRowNumber);
+    });
+
+    rowsToDelete.sort(function (left, right) {
+      return right - left;
+    }).forEach(function (rowNumber) {
+      sheet.deleteRow(rowNumber);
+    });
+
+    return {
+      deletedCount: rowsToDelete.length
+    };
   } finally {
     lock.releaseLock();
   }
