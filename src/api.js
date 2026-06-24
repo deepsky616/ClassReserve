@@ -315,16 +315,26 @@ export async function deleteReservationsAndList(ids, password, options) {
 }
 
 export async function deleteFixedScheduleAndConfirm(id, password, options) {
+  const result = await deleteFixedSchedulesAndConfirm([id], password, options);
+
+  return {
+    deleted: result.deleted,
+    fixedSchedules: result.fixedSchedules
+  };
+}
+
+export async function deleteFixedSchedulesAndConfirm(ids, password, options) {
   const body = await callGoogleScript(
     {
-      action: "deleteFixedScheduleAndList",
-      id,
+      action: "deleteFixedSchedulesAndList",
+      ids,
       password
     },
     options
   );
   const fixedSchedules = body.fixedSchedules.map(normalizeFixedSchedule);
-  const stillExists = fixedSchedules.some((fixedSchedule) => fixedSchedule.id === id);
+  const deletedIds = new Set(ids);
+  const stillExists = fixedSchedules.some((fixedSchedule) => deletedIds.has(fixedSchedule.id));
 
   if (stillExists) {
     throw createClientError(
@@ -335,6 +345,7 @@ export async function deleteFixedScheduleAndConfirm(id, password, options) {
 
   return {
     deleted: true,
+    deletedCount: body.deletedCount,
     fixedSchedules
   };
 }

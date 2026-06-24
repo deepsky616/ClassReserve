@@ -51,6 +51,15 @@ export function createReservationApp({ store }) {
     }
   });
 
+  app.post("/api/fixed-schedules/batch-delete", async (request, response, next) => {
+    try {
+      const result = await store.deleteFixedSchedules(request.body?.ids, request.body?.password);
+      response.json(result);
+    } catch (error) {
+      next(error);
+    }
+  });
+
   app.delete("/api/reservations/:id", async (request, response, next) => {
     try {
       const result = await store.deleteReservation(request.params.id, request.body?.password);

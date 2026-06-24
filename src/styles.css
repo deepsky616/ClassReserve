@@ -163,6 +163,7 @@ h2 {
 
 .schedule-toolbar {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: 12px;
   align-items: end;
@@ -327,7 +328,7 @@ button:focus-visible {
 
 .fixed-schedule-item {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: auto 1fr auto;
   gap: 8px;
   align-items: center;
   border-left: 4px solid var(--warning);
@@ -588,6 +589,13 @@ form {
 .fixed-schedule-list {
   display: grid;
   gap: 8px;
+}
+
+.fixed-panel-actions {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  padding: 8px;
 }
 
 @media (max-width: 980px) {

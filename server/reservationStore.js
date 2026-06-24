@@ -193,21 +193,38 @@ export function createReservationStore(options = {}) {
   }
 
   async function deleteFixedSchedule(fixedScheduleId, password) {
+    const result = await deleteFixedSchedules([fixedScheduleId], password);
+    return { deleted: result.deletedCount === 1 };
+  }
+
+  async function deleteFixedSchedules(fixedScheduleIds, password) {
     verifyAdminPassword(password, adminPassword);
 
-    if (!fixedScheduleId) {
+    if (!Array.isArray(fixedScheduleIds) || fixedScheduleIds.length === 0) {
+      throw createError("삭제할 고정 사용을 선택해 주세요.", "VALIDATION_ERROR", 400);
+    }
+
+    const targetIds = [...new Set(fixedScheduleIds.map((fixedScheduleId) => String(fixedScheduleId)).filter(Boolean))];
+
+    if (targetIds.length === 0) {
       throw createError("삭제할 고정 사용을 선택해 주세요.", "VALIDATION_ERROR", 400);
     }
 
     const fixedSchedules = await readFixedSchedules();
-    const fixedSchedule = fixedSchedules.find((item) => item.id === fixedScheduleId);
+    const existingIds = new Set(fixedSchedules.map((item) => item.id));
+    const missingId = targetIds.find((targetId) => !existingIds.has(targetId));
 
-    if (!fixedSchedule) {
+    if (missingId) {
       throw createError("고정 사용을 찾을 수 없습니다.", "NOT_FOUND", 404);
     }
 
-    await writeFixedSchedules(fixedSchedules.filter((item) => item.id !== fixedScheduleId));
-    return { deleted: true };
+    const targetIdSet = new Set(targetIds);
+    await writeFixedSchedules(fixedSchedules.filter((item) => !targetIdSet.has(item.id)));
+
+    return {
+      deleted: true,
+      deletedCount: targetIds.length
+    };
   }
 
   return {
@@ -217,7 +234,8 @@ export function createReservationStore(options = {}) {
     createReservations,
     createFixedSchedules,
     deleteReservation,
-    deleteFixedSchedule
+    deleteFixedSchedule,
+    deleteFixedSchedules
   };
 }
 

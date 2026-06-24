@@ -3,6 +3,7 @@ import {
   createFixedScheduleRangeAndConfirm,
   createReservationRangeAndConfirm,
   deleteFixedScheduleAndConfirm,
+  deleteFixedSchedulesAndConfirm,
   deleteReservationAndConfirm,
   deleteReservationsAndConfirm,
   fetchFixedSchedules,
@@ -38,6 +39,10 @@ import {
   getFixedSchedulePanelButtonLabel,
   getFixedSchedulePanelSummary
 } from "./fixedSchedulePanel.js";
+import {
+  formatSelectedFixedScheduleSummary,
+  getSelectedFixedSchedules
+} from "./fixedScheduleSelection.js";
 
 const initialForm = {
   date: toDateKey(new Date()),
@@ -73,7 +78,10 @@ const messageByCode = {
 };
 
 function errorMessage(error, fallback) {
-  if (error.code === "DUPLICATE_RESERVATION" && error.message) {
+  if (
+    ["DUPLICATE_RESERVATION", "PERSISTENCE_UNCONFIRMED", "DELETE_UNCONFIRMED"].includes(error.code) &&
+    error.message
+  ) {
     return error.message;
   }
 
@@ -114,7 +122,9 @@ export default function App() {
   const [isFixedSchedulePanelOpen, setIsFixedSchedulePanelOpen] = useState(FIXED_SCHEDULE_PANEL_DEFAULT_OPEN);
   const [cleaningDuplicates, setCleaningDuplicates] = useState(false);
   const [deletingSelected, setDeletingSelected] = useState(false);
+  const [deletingSelectedFixedSchedules, setDeletingSelectedFixedSchedules] = useState(false);
   const [selectedReservationIds, setSelectedReservationIds] = useState(() => new Set());
+  const [selectedFixedScheduleIds, setSelectedFixedScheduleIds] = useState(() => new Set());
   const [connectionStatus, setConnectionStatus] = useState("checking");
   const [viewMode, setViewMode] = useState("table");
 
@@ -129,6 +139,9 @@ export default function App() {
   const selectedReservations = useMemo(() => {
     return getSelectedReservations(reservations, selectedReservationIds);
   }, [reservations, selectedReservationIds]);
+  const selectedFixedSchedules = useMemo(() => {
+    return getSelectedFixedSchedules(fixedSchedules, selectedFixedScheduleIds);
+  }, [fixedSchedules, selectedFixedScheduleIds]);
 
   const visibleReservations = useMemo(() => {
     const weekKeys = new Set(weekDays.map((day) => day.key));
@@ -156,6 +169,14 @@ export default function App() {
       return next.size === current.size ? current : next;
     });
   }, [reservations]);
+
+  useEffect(() => {
+    setSelectedFixedScheduleIds((current) => {
+      const existingIds = new Set(fixedSchedules.map((fixedSchedule) => fixedSchedule.id));
+      const next = new Set([...current].filter((id) => existingIds.has(id)));
+      return next.size === current.size ? current : next;
+    });
+  }, [fixedSchedules]);
 
   async function loadReservations() {
     setLoading(true);
@@ -374,12 +395,53 @@ export default function App() {
     try {
       const result = await deleteFixedScheduleAndConfirm(fixedSchedule.id, password);
       setFixedSchedules(result.fixedSchedules);
+      setSelectedFixedScheduleIds((current) => {
+        const next = new Set(current);
+        next.delete(fixedSchedule.id);
+        return next;
+      });
       setMessage({ type: "success", text: "고정 사용을 삭제했습니다." });
     } catch (error) {
       setMessage({
         type: "error",
         text: errorMessage(error, "고정 사용을 삭제하지 못했습니다.")
       });
+    }
+  }
+
+  async function handleDeleteSelectedFixedSchedules() {
+    if (selectedFixedSchedules.length === 0) {
+      setMessage({ type: "error", text: "삭제할 고정 사용을 선택해 주세요." });
+      return;
+    }
+
+    const summary = formatSelectedFixedScheduleSummary(selectedFixedSchedules);
+    const password = window.prompt(`${summary} 삭제를 위한 관리자 비밀번호를 입력해 주세요.`);
+
+    if (!password) {
+      return;
+    }
+
+    const shouldDelete = window.confirm(`${summary}을 삭제할까요?`);
+
+    if (!shouldDelete) {
+      return;
+    }
+
+    setDeletingSelectedFixedSchedules(true);
+    try {
+      const ids = selectedFixedSchedules.map((fixedSchedule) => fixedSchedule.id);
+      const result = await deleteFixedSchedulesAndConfirm(ids, password);
+      setFixedSchedules(result.fixedSchedules);
+      setSelectedFixedScheduleIds(new Set());
+      setMessage({ type: "success", text: `선택한 고정 사용 ${result.deletedCount}건을 삭제했습니다.` });
+    } catch (error) {
+      setMessage({
+        type: "error",
+        text: errorMessage(error, "선택한 고정 사용을 삭제하지 못했습니다.")
+      });
+    } finally {
+      setDeletingSelectedFixedSchedules(false);
     }
   }
 
@@ -391,6 +453,20 @@ export default function App() {
         next.delete(reservationId);
       } else {
         next.add(reservationId);
+      }
+
+      return next;
+    });
+  }
+
+  function toggleFixedScheduleSelection(fixedScheduleId) {
+    setSelectedFixedScheduleIds((current) => {
+      const next = new Set(current);
+
+      if (next.has(fixedScheduleId)) {
+        next.delete(fixedScheduleId);
+      } else {
+        next.add(fixedScheduleId);
       }
 
       return next;
@@ -504,8 +580,18 @@ export default function App() {
   }
 
   function renderFixedScheduleItem(fixedSchedule, options = {}) {
+    const checked = selectedFixedScheduleIds.has(fixedSchedule.id);
+
     return (
       <article className={`fixed-schedule-item ${ROOM_TONE_CLASSES[fixedSchedule.room] ?? ""}`} key={fixedSchedule.id}>
+        <label className="select-reservation">
+          <input
+            type="checkbox"
+            checked={checked}
+            aria-label={`${getWeekdayLabel(fixedSchedule.weekday)} ${fixedSchedule.period}교시 ${fixedSchedule.room} 고정 사용 선택`}
+            onChange={() => toggleFixedScheduleSelection(fixedSchedule.id)}
+          />
+        </label>
         <div>
           <strong>{fixedSchedule.room}</strong>
           <span>{options.showWeekday ? `${getWeekdayLabel(fixedSchedule.weekday)} ` : ""}{fixedSchedule.period}교시 고정</span>
@@ -601,6 +687,26 @@ export default function App() {
                   onClick={() => setSelectedReservationIds(new Set())}
                 >
                   선택 해제
+                </button>
+              </div>
+
+              <div className="selection-actions fixed-selection-actions" aria-label="고정 사용 선택 삭제">
+                <span>고정 선택 {selectedFixedSchedules.length}건</span>
+                <button
+                  type="button"
+                  className="delete-selected-button"
+                  disabled={deletingSelectedFixedSchedules || selectedFixedSchedules.length === 0}
+                  onClick={handleDeleteSelectedFixedSchedules}
+                >
+                  {deletingSelectedFixedSchedules ? "삭제 중" : "고정 삭제"}
+                </button>
+                <button
+                  type="button"
+                  className="ghost-button compact"
+                  disabled={selectedFixedSchedules.length === 0}
+                  onClick={() => setSelectedFixedScheduleIds(new Set())}
+                >
+                  고정 해제
                 </button>
               </div>
             </div>
@@ -897,7 +1003,36 @@ export default function App() {
                     {fixedSchedules.length === 0 ? (
                       <p className="duplicate-summary">등록된 고정 사용 없음</p>
                     ) : (
-                      fixedSchedules.map((fixedSchedule) => renderFixedScheduleItem(fixedSchedule, { showWeekday: true }))
+                      <>
+                        <div className="selection-actions fixed-panel-actions" aria-label="고정 사용 목록 선택 삭제">
+                          <span>고정 선택 {selectedFixedSchedules.length}건</span>
+                          <button
+                            type="button"
+                            className="ghost-button compact"
+                            disabled={fixedSchedules.length === 0}
+                            onClick={() => setSelectedFixedScheduleIds(new Set(fixedSchedules.map((fixedSchedule) => fixedSchedule.id)))}
+                          >
+                            전체 선택
+                          </button>
+                          <button
+                            type="button"
+                            className="ghost-button compact"
+                            disabled={selectedFixedSchedules.length === 0}
+                            onClick={() => setSelectedFixedScheduleIds(new Set())}
+                          >
+                            선택 해제
+                          </button>
+                          <button
+                            type="button"
+                            className="delete-selected-button"
+                            disabled={deletingSelectedFixedSchedules || selectedFixedSchedules.length === 0}
+                            onClick={handleDeleteSelectedFixedSchedules}
+                          >
+                            {deletingSelectedFixedSchedules ? "삭제 중" : "선택 삭제"}
+                          </button>
+                        </div>
+                        {fixedSchedules.map((fixedSchedule) => renderFixedScheduleItem(fixedSchedule, { showWeekday: true }))}
+                      </>
                     )}
                   </div>
                 </div>

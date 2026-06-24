@@ -94,8 +94,8 @@ function handleAction(payload) {
     return deleteManyAndList(payload.ids, payload.password);
   }
 
-  if (payload.action === "deleteFixedScheduleAndList") {
-    return deleteFixedScheduleAndList(payload.id, payload.password);
+  if (payload.action === "deleteFixedSchedulesAndList") {
+    return deleteFixedSchedulesAndList(payload.ids, payload.password);
   }
 
   throw createError("지원하지 않는 요청입니다.", "VALIDATION_ERROR");
@@ -323,20 +323,33 @@ function deleteReservations(ids, password) {
   }
 }
 
-function deleteFixedScheduleAndList(id, password) {
-  deleteFixedSchedule(id, password);
+function deleteFixedSchedulesAndList(ids, password) {
+  const result = deleteFixedSchedules(ids, password);
 
   return {
     ok: true,
     deleted: true,
+    deletedCount: result.deletedCount,
     fixedSchedules: listFixedSchedules()
   };
 }
 
-function deleteFixedSchedule(id, password) {
+function deleteFixedSchedules(ids, password) {
   verifyAdminPassword(password);
 
-  if (!id) {
+  if (!Array.isArray(ids) || ids.length === 0) {
+    throw createError("삭제할 고정 사용을 선택해 주세요.", "VALIDATION_ERROR");
+  }
+
+  const targetIds = [];
+  ids.forEach(function (id) {
+    const value = String(id);
+    if (value && targetIds.indexOf(value) === -1) {
+      targetIds.push(value);
+    }
+  });
+
+  if (targetIds.length === 0) {
     throw createError("삭제할 고정 사용을 선택해 주세요.", "VALIDATION_ERROR");
   }
 
@@ -346,23 +359,36 @@ function deleteFixedSchedule(id, password) {
   try {
     const sheet = getFixedScheduleSheet();
     const values = sheet.getDataRange().getValues();
-    let matchedRowNumber = null;
+    const rowsToDelete = [];
 
-    for (let rowIndex = 1; rowIndex < values.length; rowIndex += 1) {
-      const fixedSchedule = rowToFixedSchedule(values[rowIndex]);
+    targetIds.forEach(function (id) {
+      let matchedRowNumber = null;
 
-      if (fixedSchedule.id === String(id)) {
-        matchedRowNumber = rowIndex + 1;
-        break;
+      for (let rowIndex = 1; rowIndex < values.length; rowIndex += 1) {
+        const fixedSchedule = rowToFixedSchedule(values[rowIndex]);
+
+        if (fixedSchedule.id === id) {
+          matchedRowNumber = rowIndex + 1;
+          break;
+        }
       }
-    }
 
-    if (!matchedRowNumber) {
-      throw createError("고정 사용을 찾을 수 없습니다.", "NOT_FOUND");
-    }
+      if (!matchedRowNumber) {
+        throw createError("고정 사용을 찾을 수 없습니다.", "NOT_FOUND");
+      }
 
-    sheet.deleteRow(matchedRowNumber);
-    return { deleted: true };
+      rowsToDelete.push(matchedRowNumber);
+    });
+
+    rowsToDelete.sort(function (left, right) {
+      return right - left;
+    }).forEach(function (rowNumber) {
+      sheet.deleteRow(rowNumber);
+    });
+
+    return {
+      deletedCount: rowsToDelete.length
+    };
   } finally {
     lock.releaseLock();
   }

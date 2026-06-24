@@ -40,3 +40,9 @@ test("선택 고정 사용 삭제 확인 문구를 만든다", () => {
 
   assert.equal(summary, "월요일 음악실 2교시, 3교시 고정 사용 2건");
 });
+
+test("여러 묶음 고정 사용 선택 삭제 확인 문구를 만든다", () => {
+  const summary = formatSelectedFixedScheduleSummary(fixedSchedules);
+
+  assert.equal(summary, "월요일 음악실 2교시, 3교시 외 1묶음 고정 사용 3건");
+});
