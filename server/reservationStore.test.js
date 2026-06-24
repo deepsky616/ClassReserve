@@ -125,6 +125,43 @@ test("여러 교시 예약은 모두 저장되거나 모두 거부된다", async
   });
 });
 
+test("예약 생성은 최신 예약 목록까지 같은 저장소 작업에서 반환한다", async () => {
+  await withStore(async (store) => {
+    const result = await store.createReservationsAndList([
+      { ...validInput, period: 1 },
+      { ...validInput, period: 2 }
+    ]);
+
+    assert.deepEqual(result.createdReservations.map((reservation) => reservation.period), [1, 2]);
+    assert.deepEqual(result.reservations.map((reservation) => reservation.period), [1, 2]);
+  }, {
+    id: (() => {
+      let nextId = 1;
+      return () => `reservation-${nextId++}`;
+    })()
+  });
+});
+
+test("예약 삭제는 최신 예약 목록까지 같은 저장소 작업에서 반환한다", async () => {
+  await withStore(async (store) => {
+    await store.createReservations([
+      { ...validInput, period: 1 },
+      { ...validInput, period: 2 },
+      { ...validInput, period: 3 }
+    ]);
+
+    const result = await store.deleteReservationsAndList(["reservation-1", "reservation-2"], "1234");
+
+    assert.equal(result.deletedCount, 2);
+    assert.deepEqual(result.reservations.map((reservation) => reservation.id), ["reservation-3"]);
+  }, {
+    id: (() => {
+      let nextId = 1;
+      return () => `reservation-${nextId++}`;
+    })()
+  });
+});
+
 test("중복 예약 오류는 이미 예약한 학년과 반을 알려준다", async () => {
   await withStore(async (store) => {
     await store.createReservation(validInput);
@@ -428,6 +465,75 @@ test("여러 고정 사용은 관리자 비밀번호로 한 번에 삭제한다"
 
     assert.equal(result.deletedCount, 2);
     assert.deepEqual(await store.listFixedSchedules(), []);
+  }, {
+    adminPassword: "admin-pass",
+    id: (() => {
+      let nextId = 1;
+      return () => `fixed-${nextId++}`;
+    })()
+  });
+});
+
+test("고정 사용 등록은 최신 고정 사용 목록까지 같은 저장소 작업에서 반환한다", async () => {
+  await withStore(async (store) => {
+    const result = await store.createFixedSchedulesAndList([
+      {
+        weekday: 1,
+        period: 2,
+        room: "음악실",
+        label: "3학년 음악",
+        password: "admin-pass"
+      },
+      {
+        weekday: 1,
+        period: 3,
+        room: "음악실",
+        label: "3학년 음악",
+        password: "admin-pass"
+      }
+    ]);
+
+    assert.deepEqual(result.createdFixedSchedules.map((fixedSchedule) => fixedSchedule.period), [2, 3]);
+    assert.deepEqual(result.fixedSchedules.map((fixedSchedule) => fixedSchedule.period), [2, 3]);
+  }, {
+    adminPassword: "admin-pass",
+    id: (() => {
+      let nextId = 1;
+      return () => `fixed-${nextId++}`;
+    })()
+  });
+});
+
+test("고정 사용 삭제는 최신 고정 사용 목록까지 같은 저장소 작업에서 반환한다", async () => {
+  await withStore(async (store) => {
+    await store.createFixedSchedules([
+      {
+        weekday: 1,
+        period: 2,
+        room: "음악실",
+        label: "3학년 음악",
+        password: "admin-pass"
+      },
+      {
+        weekday: 1,
+        period: 3,
+        room: "음악실",
+        label: "3학년 음악",
+        password: "admin-pass"
+      },
+      {
+        weekday: 2,
+        period: 4,
+        room: "체육관",
+        label: "5학년 체육",
+        password: "admin-pass"
+      }
+    ]);
+
+    const result = await store.deleteFixedSchedulesAndList(["fixed-1", "fixed-2"], "admin-pass");
+
+    assert.equal(result.deletedCount, 2);
+    assert.deepEqual(result.fixedSchedules.map((fixedSchedule) => fixedSchedule.id), ["fixed-3"]);
   }, {
     adminPassword: "admin-pass",
     id: (() => {
