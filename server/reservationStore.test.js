@@ -285,3 +285,75 @@ test("관리자 비밀번호로 예약을 삭제할 수 있다", async () => {
     assert.deepEqual(await store.listReservations(), []);
   }, { adminPassword: "admin-pass" });
 });
+
+test("고정 사용을 등록하고 조회할 때 관리자 비밀번호는 응답하지 않는다", async () => {
+  await withStore(async (store) => {
+    const created = await store.createFixedSchedules([
+      {
+        weekday: 1,
+        period: 2,
+        room: "음악실",
+        label: "3학년 음악",
+        password: "admin-pass"
+      }
+    ]);
+    const listed = await store.listFixedSchedules();
+
+    assert.equal(created.length, 1);
+    assert.equal(created[0].room, "음악실");
+    assert.equal(created[0].label, "3학년 음악");
+    assert.equal(created[0].password, undefined);
+    assert.deepEqual(listed, created);
+  }, { adminPassword: "admin-pass" });
+});
+
+test("고정 사용 시간에는 일반 예약을 만들 수 없다", async () => {
+  await withStore(async (store) => {
+    await store.createFixedSchedules([
+      {
+        weekday: 1,
+        period: 2,
+        room: "음악실",
+        label: "3학년 음악",
+        password: "admin-pass"
+      }
+    ]);
+
+    await assert.rejects(
+      () => store.createReservation({
+        ...validInput,
+        date: "2026-06-22",
+        period: 2,
+        room: "음악실"
+      }),
+      {
+        code: "FIXED_SCHEDULE_CONFLICT",
+        message: "매주 월요일 2교시는 음악실 고정 사용 시간(3학년 음악)이라 예약할 수 없습니다."
+      }
+    );
+  }, { adminPassword: "admin-pass" });
+});
+
+test("고정 사용은 관리자 비밀번호로 삭제한다", async () => {
+  await withStore(async (store) => {
+    const [created] = await store.createFixedSchedules([
+      {
+        weekday: 3,
+        period: 4,
+        room: "체육관",
+        label: "5학년 체육",
+        password: "admin-pass"
+      }
+    ]);
+
+    await assert.rejects(
+      () => store.deleteFixedSchedule(created.id, "wrong"),
+      { code: "INVALID_PASSWORD" }
+    );
+
+    const result = await store.deleteFixedSchedule(created.id, "admin-pass");
+
+    assert.equal(result.deleted, true);
+    assert.deepEqual(await store.listFixedSchedules(), []);
+  }, { adminPassword: "admin-pass" });
+});

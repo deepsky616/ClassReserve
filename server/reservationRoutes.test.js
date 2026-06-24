@@ -10,8 +10,13 @@ async function withTestServer(run) {
   const directory = await mkdtemp(path.join(tmpdir(), "class-reserve-api-"));
   const store = createReservationStore({
     filePath: path.join(directory, "reservations.json"),
+    fixedFilePath: path.join(directory, "fixed-schedules.json"),
     now: () => "2026-06-10T00:00:00.000Z",
-    id: () => "reservation-1"
+    id: (() => {
+      let nextId = 1;
+      return () => `id-${nextId++}`;
+    })(),
+    adminPassword: "admin-pass"
   });
   const app = createReservationApp({ store });
   const server = app.listen(0);
@@ -44,6 +49,47 @@ test("예약 목록을 조회한다", async () => {
 
     assert.equal(response.status, 200);
     assert.deepEqual(body.reservations, []);
+  });
+});
+
+test("고정 사용을 만들고 조회하고 삭제한다", async () => {
+  await withTestServer(async (baseUrl) => {
+    const createResponse = await fetch(`${baseUrl}/api/fixed-schedules/batch`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        schedules: [
+          {
+            weekday: 1,
+            period: 2,
+            room: "음악실",
+            label: "3학년 음악",
+            password: "admin-pass"
+          }
+        ]
+      })
+    });
+    const createBody = await createResponse.json();
+
+    assert.equal(createResponse.status, 201);
+    assert.equal(createBody.fixedSchedules[0].room, "음악실");
+    assert.equal(createBody.fixedSchedules[0].password, undefined);
+
+    const listResponse = await fetch(`${baseUrl}/api/fixed-schedules`);
+    const listBody = await listResponse.json();
+
+    assert.equal(listResponse.status, 200);
+    assert.equal(listBody.fixedSchedules.length, 1);
+
+    const deleteResponse = await fetch(`${baseUrl}/api/fixed-schedules/${createBody.fixedSchedules[0].id}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: "admin-pass" })
+    });
+    const deleteBody = await deleteResponse.json();
+
+    assert.equal(deleteResponse.status, 200);
+    assert.equal(deleteBody.deleted, true);
   });
 });
 
@@ -91,7 +137,7 @@ test("틀린 비밀번호로 삭제하면 거부한다", async () => {
       body: JSON.stringify(reservationInput)
     });
 
-    const response = await fetch(`${baseUrl}/api/reservations/reservation-1`, {
+    const response = await fetch(`${baseUrl}/api/reservations/id-1`, {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ password: "wrong" })
