@@ -58,11 +58,62 @@ function installJsonpDomHarness(responseForUrl) {
   };
 }
 
+function installNoResponseJsonpDomHarness() {
+  const originalDocument = globalThis.document;
+  const originalWindow = globalThis.window;
+  const appendedScripts = [];
+
+  globalThis.window = globalThis;
+  globalThis.document = {
+    createElement(tagName) {
+      assert.equal(tagName, "script");
+      return {};
+    },
+    body: {
+      appendChild(script) {
+        appendedScripts.push(script);
+      },
+      removeChild() {}
+    }
+  };
+
+  return {
+    getLastScriptUrl() {
+      return appendedScripts.at(-1)?.src;
+    },
+    restore() {
+      globalThis.document = originalDocument;
+      globalThis.window = originalWindow;
+    }
+  };
+}
+
 test("구글 스크립트 주소가 없으면 설정 오류로 분류한다", async () => {
   await assert.rejects(
     () => fetchReservations({ scriptUrl: "" }),
     { code: "CONFIG_MISSING" }
   );
+});
+
+test("구글 스크립트 응답 지연은 시간 초과 오류로 분류한다", async () => {
+  const harness = installNoResponseJsonpDomHarness();
+
+  try {
+    await assert.rejects(
+      () => fetchFixedSchedules({
+        scriptUrl: "https://script.google.com/macros/s/example/exec",
+        timeoutMs: 1
+      }),
+      {
+        code: "GOOGLE_SCRIPT_TIMEOUT",
+        message: "구글 앱스 스크립트 응답 시간이 초과되었습니다. 잠시 뒤 다시 시도해 주세요."
+      }
+    );
+
+    assert.match(harness.getLastScriptUrl(), /listFixedSchedules/);
+  } finally {
+    harness.restore();
+  }
 });
 
 test("JSONP로 예약 목록을 조회한다", async () => {
