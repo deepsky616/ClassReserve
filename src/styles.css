@@ -586,16 +586,21 @@ form {
   width: 100%;
 }
 
-.fixed-schedule-list {
-  display: grid;
-  gap: 8px;
-}
-
-.fixed-panel-actions {
+.fixed-management-hint {
   border: 1px solid var(--line);
   border-radius: 6px;
   background: var(--panel);
+  color: var(--subtle);
+  display: grid;
+  font-size: 13px;
+  font-weight: 800;
+  gap: 4px;
   padding: 8px;
+}
+
+.fixed-management-hint strong {
+  color: var(--ink);
+  font-size: 14px;
 }
 
 @media (max-width: 980px) {

@@ -37,6 +37,7 @@ import {
 import {
   FIXED_SCHEDULE_PANEL_DEFAULT_OPEN,
   getFixedSchedulePanelButtonLabel,
+  getFixedSchedulePanelManagementHint,
   getFixedSchedulePanelSummary
 } from "./fixedSchedulePanel.js";
 import {
@@ -999,41 +1000,9 @@ export default function App() {
                     </button>
                   </form>
 
-                  <div className="fixed-schedule-list" aria-label="등록된 고정 사용">
-                    {fixedSchedules.length === 0 ? (
-                      <p className="duplicate-summary">등록된 고정 사용 없음</p>
-                    ) : (
-                      <>
-                        <div className="selection-actions fixed-panel-actions" aria-label="고정 사용 목록 선택 삭제">
-                          <span>고정 선택 {selectedFixedSchedules.length}건</span>
-                          <button
-                            type="button"
-                            className="ghost-button compact"
-                            disabled={fixedSchedules.length === 0}
-                            onClick={() => setSelectedFixedScheduleIds(new Set(fixedSchedules.map((fixedSchedule) => fixedSchedule.id)))}
-                          >
-                            전체 선택
-                          </button>
-                          <button
-                            type="button"
-                            className="ghost-button compact"
-                            disabled={selectedFixedSchedules.length === 0}
-                            onClick={() => setSelectedFixedScheduleIds(new Set())}
-                          >
-                            선택 해제
-                          </button>
-                          <button
-                            type="button"
-                            className="delete-selected-button"
-                            disabled={deletingSelectedFixedSchedules || selectedFixedSchedules.length === 0}
-                            onClick={handleDeleteSelectedFixedSchedules}
-                          >
-                            {deletingSelectedFixedSchedules ? "삭제 중" : "선택 삭제"}
-                          </button>
-                        </div>
-                        {fixedSchedules.map((fixedSchedule) => renderFixedScheduleItem(fixedSchedule, { showWeekday: true }))}
-                      </>
-                    )}
+                  <div className="fixed-management-hint" aria-label="고정 사용 관리 안내">
+                    <strong>확인과 삭제는 달력에서</strong>
+                    <span>{getFixedSchedulePanelManagementHint(fixedSchedules.length)}</span>
                   </div>
                 </div>
               ) : null}
