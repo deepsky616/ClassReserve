@@ -1,6 +1,7 @@
 import { toDateKey } from "./dateUtils.js";
 import { normalizeRoomName } from "./roomUtils.js";
 import { getPeriodRange } from "./periodRange.js";
+import { normalizeFixedSchedule } from "./fixedSchedules.js";
 
 const DEFAULT_TIMEOUT_MS = 15000;
 
@@ -77,6 +78,19 @@ function isPersistedReservation(reservation, reservations) {
   });
 }
 
+function isPersistedFixedSchedule(fixedSchedule, fixedSchedules) {
+  return fixedSchedules.some((item) => {
+    return (
+      item.id === fixedSchedule.id ||
+      (
+        Number(item.weekday) === Number(fixedSchedule.weekday) &&
+        Number(item.period) === Number(fixedSchedule.period) &&
+        item.room === fixedSchedule.room
+      )
+    );
+  });
+}
+
 function normalizeDateValue(value) {
   if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
     return value;
@@ -101,6 +115,11 @@ function normalizeReservation(reservation) {
 export async function fetchReservations(options) {
   const body = await callGoogleScript({ action: "list" }, options);
   return body.reservations.map(normalizeReservation);
+}
+
+export async function fetchFixedSchedules(options) {
+  const body = await callGoogleScript({ action: "listFixedSchedules" }, options);
+  return body.fixedSchedules.map(normalizeFixedSchedule);
 }
 
 export async function createReservation(input, options) {
@@ -140,6 +159,21 @@ export async function createReservationsAndList(inputs, options) {
   };
 }
 
+export async function createFixedSchedulesAndList(inputs, options) {
+  const body = await callGoogleScript(
+    {
+      action: "createFixedSchedulesAndList",
+      fixedSchedules: inputs
+    },
+    options
+  );
+
+  return {
+    createdFixedSchedules: body.createdFixedSchedules.map(normalizeFixedSchedule),
+    fixedSchedules: body.fixedSchedules.map(normalizeFixedSchedule)
+  };
+}
+
 function confirmCreatedReservations(createdReservations, reservations) {
   const hasUnconfirmedReservation = createdReservations.some((reservation) => {
     return !reservation || !isPersistedReservation(reservation, reservations);
@@ -148,6 +182,19 @@ function confirmCreatedReservations(createdReservations, reservations) {
   if (hasUnconfirmedReservation) {
     throw createClientError(
       "예약 저장을 확인하지 못했습니다. 저장소 배포 상태를 확인해 주세요.",
+      "PERSISTENCE_UNCONFIRMED"
+    );
+  }
+}
+
+function confirmCreatedFixedSchedules(createdFixedSchedules, fixedSchedules) {
+  const hasUnconfirmedFixedSchedule = createdFixedSchedules.some((fixedSchedule) => {
+    return !fixedSchedule || !isPersistedFixedSchedule(fixedSchedule, fixedSchedules);
+  });
+
+  if (hasUnconfirmedFixedSchedule) {
+    throw createClientError(
+      "고정 사용 저장을 확인하지 못했습니다. 저장소 배포 상태를 확인해 주세요.",
       "PERSISTENCE_UNCONFIRMED"
     );
   }
@@ -180,6 +227,24 @@ export async function createReservationRangeAndConfirm(input, options) {
   return {
     createdReservations: result.createdReservations,
     reservations: result.reservations
+  };
+}
+
+export async function createFixedScheduleRangeAndConfirm(input, options) {
+  const periods = getPeriodRange(input.startPeriod, input.endPeriod);
+  const fixedScheduleInputs = periods.map((period) => {
+    const { startPeriod, endPeriod, ...fixedScheduleInput } = input;
+    return {
+      ...fixedScheduleInput,
+      period
+    };
+  });
+  const result = await createFixedSchedulesAndList(fixedScheduleInputs, options);
+  confirmCreatedFixedSchedules(result.createdFixedSchedules, result.fixedSchedules);
+
+  return {
+    createdFixedSchedules: result.createdFixedSchedules,
+    fixedSchedules: result.fixedSchedules
   };
 }
 
@@ -246,5 +311,30 @@ export async function deleteReservationsAndList(ids, password, options) {
     deleted: true,
     deletedCount: body.deletedCount,
     reservations: body.reservations.map(normalizeReservation)
+  };
+}
+
+export async function deleteFixedScheduleAndConfirm(id, password, options) {
+  const body = await callGoogleScript(
+    {
+      action: "deleteFixedScheduleAndList",
+      id,
+      password
+    },
+    options
+  );
+  const fixedSchedules = body.fixedSchedules.map(normalizeFixedSchedule);
+  const stillExists = fixedSchedules.some((fixedSchedule) => fixedSchedule.id === id);
+
+  if (stillExists) {
+    throw createClientError(
+      "고정 사용 삭제를 확인하지 못했습니다. 저장소 배포 상태를 확인해 주세요.",
+      "DELETE_UNCONFIRMED"
+    );
+  }
+
+  return {
+    deleted: true,
+    fixedSchedules
   };
 }

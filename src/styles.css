@@ -325,6 +325,17 @@ button:focus-visible {
   padding: 8px;
 }
 
+.fixed-schedule-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+  border-left: 4px solid var(--warning);
+  border-radius: 6px;
+  background: var(--warning-soft);
+  padding: 8px;
+}
+
 .select-reservation {
   align-items: center;
   display: flex;
@@ -339,51 +350,62 @@ button:focus-visible {
   width: 18px;
 }
 
-.reservation-item.tone-computer {
+.reservation-item.tone-computer,
+.fixed-schedule-item.tone-computer {
   border-left-color: #2563eb;
   background: #dbeafe;
 }
 
-.reservation-item.tone-ai {
+.reservation-item.tone-ai,
+.fixed-schedule-item.tone-ai {
   border-left-color: #c2410c;
   background: #ffedd5;
 }
 
-.reservation-item.tone-music {
+.reservation-item.tone-music,
+.fixed-schedule-item.tone-music {
   border-left-color: #db2777;
   background: #fce7f3;
 }
 
-.reservation-item.tone-meeting {
+.reservation-item.tone-meeting,
+.fixed-schedule-item.tone-meeting {
   border-left-color: #4d7c0f;
   background: #ecfccb;
 }
 
-.reservation-item.tone-play {
+.reservation-item.tone-play,
+.fixed-schedule-item.tone-play {
   border-left-color: var(--accent);
   background: var(--accent-soft);
 }
 
-.reservation-item.tone-activity {
+.reservation-item.tone-activity,
+.fixed-schedule-item.tone-activity {
   border-left-color: #0891b2;
   background: #cffafe;
 }
 
-.reservation-item.tone-gym {
+.reservation-item.tone-gym,
+.fixed-schedule-item.tone-gym {
   border-left-color: #475569;
   background: #e2e8f0;
 }
 
 .reservation-item strong,
-.reservation-item span {
+.reservation-item span,
+.fixed-schedule-item strong,
+.fixed-schedule-item span {
   display: block;
 }
 
-.reservation-item strong {
+.reservation-item strong,
+.fixed-schedule-item strong {
   font-size: 14px;
 }
 
-.reservation-item span {
+.reservation-item span,
+.fixed-schedule-item span {
   color: var(--subtle);
   font-size: 12px;
   margin-top: 3px;
@@ -538,6 +560,11 @@ form {
   color: var(--warning);
   font-weight: 900;
   width: 100%;
+}
+
+.fixed-schedule-list {
+  display: grid;
+  gap: 8px;
 }
 
 @media (max-width: 980px) {

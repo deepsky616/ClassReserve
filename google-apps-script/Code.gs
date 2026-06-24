@@ -1,4 +1,5 @@
 const SHEET_NAME = "reservations";
+const FIXED_SCHEDULE_SHEET_NAME = "fixed_schedules";
 const SPREADSHEET_ID_PROPERTY = "SPREADSHEET_ID";
 const ADMIN_DELETE_PASSWORD_PROPERTY = "ADMIN_DELETE_PASSWORD";
 const ALLOWED_ROOMS = ["창의놀이실", "신체활동실", "AI캠퍼스", "음악실", "다모임실", "체육관", "컴퓨터실"];
@@ -17,6 +18,7 @@ const CLASS_OPTIONS_BY_GRADE = {
   "6": [1, 2, 3, 4, 5, 6]
 };
 const HEADER = ["id", "date", "period", "room", "grade", "classNumber", "passwordHash", "createdAt"];
+const FIXED_SCHEDULE_HEADER = ["id", "weekday", "period", "room", "label", "createdAt"];
 
 function doGet(e) {
   const parameter = e && e.parameter ? e.parameter : {};
@@ -51,6 +53,13 @@ function handleAction(payload) {
     };
   }
 
+  if (payload.action === "listFixedSchedules") {
+    return {
+      ok: true,
+      fixedSchedules: listFixedSchedules()
+    };
+  }
+
   if (payload.action === "create") {
     return {
       ok: true,
@@ -69,6 +78,10 @@ function handleAction(payload) {
     return createManyAndList(payload.reservations);
   }
 
+  if (payload.action === "createFixedSchedulesAndList") {
+    return createFixedSchedulesAndList(payload.fixedSchedules);
+  }
+
   if (payload.action === "delete") {
     deleteReservation(payload.id, payload.password);
     return {
@@ -81,6 +94,10 @@ function handleAction(payload) {
     return deleteManyAndList(payload.ids, payload.password);
   }
 
+  if (payload.action === "deleteFixedScheduleAndList") {
+    return deleteFixedScheduleAndList(payload.id, payload.password);
+  }
+
   throw createError("지원하지 않는 요청입니다.", "VALIDATION_ERROR");
 }
 
@@ -88,6 +105,12 @@ function listReservations() {
   const sheet = getReservationSheet();
   const rows = readRows(sheet);
   return rows.map(toPublicReservation);
+}
+
+function listFixedSchedules() {
+  const sheet = getFixedScheduleSheet();
+  const rows = readFixedScheduleRows(sheet);
+  return rows.map(toPublicFixedSchedule).sort(sortFixedSchedules);
 }
 
 function createReservation(input) {
@@ -104,6 +127,16 @@ function createManyAndList(inputs) {
   };
 }
 
+function createFixedSchedulesAndList(inputs) {
+  const createdFixedSchedules = createFixedSchedules(inputs);
+
+  return {
+    ok: true,
+    createdFixedSchedules: createdFixedSchedules,
+    fixedSchedules: listFixedSchedules()
+  };
+}
+
 function createReservations(inputs) {
   if (!Array.isArray(inputs) || inputs.length === 0) {
     throw createError("예약 내용이 없습니다.", "VALIDATION_ERROR");
@@ -117,10 +150,17 @@ function createReservations(inputs) {
   try {
     const sheet = getReservationSheet();
     const rows = readRows(sheet);
+    const fixedSchedules = readFixedScheduleRows(getFixedScheduleSheet());
     const createdAt = new Date().toISOString();
     const createdReservations = [];
 
     inputs.forEach(function (input) {
+      const fixedConflict = findFixedScheduleConflict(fixedSchedules, input);
+
+      if (fixedConflict) {
+        throw createError(formatFixedScheduleConflictMessage(fixedConflict), "FIXED_SCHEDULE_CONFLICT");
+      }
+
       const duplicate = rows.concat(createdReservations).find(function (reservation) {
         return isSameSlot(reservation, input);
       });
@@ -149,6 +189,55 @@ function createReservations(inputs) {
       }));
 
     return createdReservations.map(toPublicReservation);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function createFixedSchedules(inputs) {
+  if (!Array.isArray(inputs) || inputs.length === 0) {
+    throw createError("고정 사용 내용이 없습니다.", "VALIDATION_ERROR");
+  }
+
+  inputs.forEach(validateFixedSchedule);
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+
+  try {
+    const sheet = getFixedScheduleSheet();
+    const rows = readFixedScheduleRows(sheet);
+    const createdAt = new Date().toISOString();
+    const createdFixedSchedules = [];
+
+    inputs.forEach(function (input) {
+      const fixedSchedule = {
+        id: Utilities.getUuid(),
+        weekday: Number(input.weekday),
+        period: Number(input.period),
+        room: normalizeRoomName(input.room),
+        label: String(input.label).trim(),
+        createdAt: createdAt
+      };
+      const duplicate = rows.concat(createdFixedSchedules).find(function (item) {
+        return isSameFixedScheduleSlot(item, fixedSchedule);
+      });
+
+      if (duplicate) {
+        throw createError("이미 같은 요일과 교시에 등록된 고정 사용입니다.", "DUPLICATE_FIXED_SCHEDULE");
+      }
+
+      createdFixedSchedules.push(fixedSchedule);
+    });
+
+    sheet.getRange(sheet.getLastRow() + 1, 1, createdFixedSchedules.length, FIXED_SCHEDULE_HEADER.length)
+      .setValues(createdFixedSchedules.map(function (fixedSchedule) {
+        return FIXED_SCHEDULE_HEADER.map(function (key) {
+          return fixedSchedule[key];
+        });
+      }));
+
+    return createdFixedSchedules.map(toPublicFixedSchedule);
   } finally {
     lock.releaseLock();
   }
@@ -234,6 +323,51 @@ function deleteReservations(ids, password) {
   }
 }
 
+function deleteFixedScheduleAndList(id, password) {
+  deleteFixedSchedule(id, password);
+
+  return {
+    ok: true,
+    deleted: true,
+    fixedSchedules: listFixedSchedules()
+  };
+}
+
+function deleteFixedSchedule(id, password) {
+  verifyAdminPassword(password);
+
+  if (!id) {
+    throw createError("삭제할 고정 사용을 선택해 주세요.", "VALIDATION_ERROR");
+  }
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+
+  try {
+    const sheet = getFixedScheduleSheet();
+    const values = sheet.getDataRange().getValues();
+    let matchedRowNumber = null;
+
+    for (let rowIndex = 1; rowIndex < values.length; rowIndex += 1) {
+      const fixedSchedule = rowToFixedSchedule(values[rowIndex]);
+
+      if (fixedSchedule.id === String(id)) {
+        matchedRowNumber = rowIndex + 1;
+        break;
+      }
+    }
+
+    if (!matchedRowNumber) {
+      throw createError("고정 사용을 찾을 수 없습니다.", "NOT_FOUND");
+    }
+
+    sheet.deleteRow(matchedRowNumber);
+    return { deleted: true };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 function getReservationSheet() {
   const spreadsheetId = PropertiesService.getScriptProperties().getProperty(SPREADSHEET_ID_PROPERTY);
 
@@ -252,6 +386,24 @@ function getReservationSheet() {
   return sheet;
 }
 
+function getFixedScheduleSheet() {
+  const spreadsheetId = PropertiesService.getScriptProperties().getProperty(SPREADSHEET_ID_PROPERTY);
+
+  if (!spreadsheetId) {
+    throw createError("시트 식별값이 설정되지 않았습니다.", "CONFIG_MISSING");
+  }
+
+  const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+  let sheet = spreadsheet.getSheetByName(FIXED_SCHEDULE_SHEET_NAME);
+
+  if (!sheet) {
+    sheet = spreadsheet.insertSheet(FIXED_SCHEDULE_SHEET_NAME);
+  }
+
+  ensureFixedScheduleHeader(sheet);
+  return sheet;
+}
+
 function ensureHeader(sheet) {
   const firstRow = sheet.getRange(1, 1, 1, HEADER.length).getValues()[0];
   const hasHeader = HEADER.every(function (name, index) {
@@ -263,6 +415,17 @@ function ensureHeader(sheet) {
   }
 
   sheet.getRange(2, 2, Math.max(sheet.getMaxRows() - 1, 1), 1).setNumberFormat("@");
+}
+
+function ensureFixedScheduleHeader(sheet) {
+  const firstRow = sheet.getRange(1, 1, 1, FIXED_SCHEDULE_HEADER.length).getValues()[0];
+  const hasHeader = FIXED_SCHEDULE_HEADER.every(function (name, index) {
+    return firstRow[index] === name;
+  });
+
+  if (!hasHeader) {
+    sheet.getRange(1, 1, 1, FIXED_SCHEDULE_HEADER.length).setValues([FIXED_SCHEDULE_HEADER]);
+  }
 }
 
 function readRows(sheet) {
@@ -280,6 +443,21 @@ function readRows(sheet) {
     .map(rowToReservation);
 }
 
+function readFixedScheduleRows(sheet) {
+  const lastRow = sheet.getLastRow();
+
+  if (lastRow < 2) {
+    return [];
+  }
+
+  return sheet.getRange(2, 1, lastRow - 1, FIXED_SCHEDULE_HEADER.length)
+    .getValues()
+    .filter(function (row) {
+      return row[0];
+    })
+    .map(rowToFixedSchedule);
+}
+
 function rowToReservation(row) {
   return {
     id: String(row[0]),
@@ -290,6 +468,17 @@ function rowToReservation(row) {
     classNumber: normalizeClassNumber(row[4], row[5]),
     passwordHash: String(row[6]),
     createdAt: String(row[7])
+  };
+}
+
+function rowToFixedSchedule(row) {
+  return {
+    id: String(row[0]),
+    weekday: Number(row[1]),
+    period: Number(row[2]),
+    room: normalizeRoomName(row[3]),
+    label: String(row[4]),
+    createdAt: String(row[5])
   };
 }
 
@@ -315,6 +504,17 @@ function toPublicReservation(reservation) {
     grade: normalizeGrade(reservation.grade),
     classNumber: normalizeClassNumber(reservation.grade, reservation.classNumber),
     createdAt: reservation.createdAt
+  };
+}
+
+function toPublicFixedSchedule(fixedSchedule) {
+  return {
+    id: fixedSchedule.id,
+    weekday: Number(fixedSchedule.weekday),
+    period: Number(fixedSchedule.period),
+    room: normalizeRoomName(fixedSchedule.room),
+    label: String(fixedSchedule.label || "").trim(),
+    createdAt: fixedSchedule.createdAt
   };
 }
 
@@ -367,6 +567,35 @@ function validateReservation(input) {
   }
 }
 
+function validateFixedSchedule(input) {
+  if (!input) {
+    throw createError("고정 사용 내용이 없습니다.", "VALIDATION_ERROR");
+  }
+
+  verifyAdminPassword(input.password);
+
+  const requiredFields = ["weekday", "period", "room", "label"];
+  const missing = requiredFields.filter(function (field) {
+    return input[field] === undefined || input[field] === null || input[field] === "";
+  });
+
+  if (missing.length > 0) {
+    throw createError("고정 사용 입력을 모두 채워 주세요.", "VALIDATION_ERROR");
+  }
+
+  if (!isIntegerInRange(input.weekday, 1, 5)) {
+    throw createError("요일은 월요일부터 금요일까지만 선택할 수 있습니다.", "VALIDATION_ERROR");
+  }
+
+  if (!isIntegerInRange(input.period, 1, 6)) {
+    throw createError("교시는 1교시부터 6교시까지 선택할 수 있습니다.", "VALIDATION_ERROR");
+  }
+
+  if (ALLOWED_ROOMS.indexOf(normalizeRoomName(input.room)) === -1) {
+    throw createError("선택할 수 없는 특별실입니다.", "VALIDATION_ERROR");
+  }
+}
+
 function isIntegerInRange(value, min, max) {
   const number = Number(value);
   return Number.isInteger(number) && number >= min && number <= max;
@@ -382,6 +611,43 @@ function isSameSlot(reservation, input) {
     Number(reservation.period) === Number(input.period) &&
     normalizeRoomName(reservation.room) === normalizeRoomName(input.room)
   );
+}
+
+function isSameFixedScheduleSlot(left, right) {
+  return (
+    Number(left.weekday) === Number(right.weekday) &&
+    Number(left.period) === Number(right.period) &&
+    normalizeRoomName(left.room) === normalizeRoomName(right.room)
+  );
+}
+
+function findFixedScheduleConflict(fixedSchedules, input) {
+  const weekday = getWeekdayFromDateKey(input.date);
+
+  return fixedSchedules.find(function (fixedSchedule) {
+    return (
+      Number(fixedSchedule.weekday) === weekday &&
+      Number(fixedSchedule.period) === Number(input.period) &&
+      normalizeRoomName(fixedSchedule.room) === normalizeRoomName(input.room)
+    );
+  }) || null;
+}
+
+function formatFixedScheduleConflictMessage(fixedSchedule) {
+  const label = String(fixedSchedule.label || "").trim();
+  const labelText = label ? "(" + label + ")" : "";
+  return "매주 " + getWeekdayLabel(fixedSchedule.weekday) + " " + Number(fixedSchedule.period) + "교시는 " + normalizeRoomName(fixedSchedule.room) + " 고정 사용 시간" + labelText + "이라 예약할 수 없습니다.";
+}
+
+function getWeekdayFromDateKey(dateKey) {
+  const parts = String(dateKey).split("-").map(function (value) {
+    return Number(value);
+  });
+  return new Date(parts[0], parts[1] - 1, parts[2]).getDay();
+}
+
+function getWeekdayLabel(weekday) {
+  return ["", "월요일", "화요일", "수요일", "목요일", "금요일"][Number(weekday)] || String(weekday) + "요일";
 }
 
 function normalizeRoomName(room) {
@@ -426,6 +692,12 @@ function getAdminDeletePassword() {
   return PropertiesService.getScriptProperties().getProperty(ADMIN_DELETE_PASSWORD_PROPERTY) || "";
 }
 
+function verifyAdminPassword(password) {
+  if (!password || password !== getAdminDeletePassword()) {
+    throw createError("관리자 비밀번호가 맞지 않습니다.", "INVALID_PASSWORD");
+  }
+}
+
 function formatReservationOwner(reservation) {
   const grade = normalizeGrade(reservation.grade);
   if (grade === KINDERGARTEN_GRADE) {
@@ -446,6 +718,18 @@ function hashPassword(password) {
     const value = byte < 0 ? byte + 256 : byte;
     return ("0" + value.toString(16)).slice(-2);
   }).join("");
+}
+
+function sortFixedSchedules(left, right) {
+  if (left.weekday !== right.weekday) {
+    return left.weekday - right.weekday;
+  }
+
+  if (left.period !== right.period) {
+    return left.period - right.period;
+  }
+
+  return left.room.localeCompare(right.room);
 }
 
 function parsePayload(payload) {

@@ -8,8 +8,10 @@ import { createReservationStore } from "./reservationStore.js";
 async function withStore(run, options = {}) {
   const directory = await mkdtemp(path.join(tmpdir(), "class-reserve-"));
   const filePath = path.join(directory, "reservations.json");
+  const fixedFilePath = path.join(directory, "fixed-schedules.json");
   const store = createReservationStore({
     filePath,
+    fixedFilePath,
     now: () => "2026-06-10T00:00:00.000Z",
     id: () => "reservation-1",
     ...options

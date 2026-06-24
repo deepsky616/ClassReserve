@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  createFixedScheduleRangeAndConfirm,
   createReservationRangeAndConfirm,
+  deleteFixedScheduleAndConfirm,
   deleteReservationAndConfirm,
   deleteReservationsAndConfirm,
+  fetchFixedSchedules,
   fetchReservations
 } from "./api.js";
 import { GRADES, KINDERGARTEN_GRADE, PERIODS, ROOM_GROUPS, ROOM_TONE_CLASSES, ROOMS, WEEKDAY_LABELS } from "./constants.js";
@@ -23,6 +26,13 @@ import {
   normalizeGradeValue
 } from "./reservationRules.js";
 import { findReservationRangeConflict, formatReservationConflictMessage } from "./reservationConflicts.js";
+import {
+  WEEKDAY_OPTIONS,
+  findFixedScheduleRangeConflict,
+  formatFixedScheduleConflictMessage,
+  getWeekdayFromDateKey,
+  getWeekdayLabel
+} from "./fixedSchedules.js";
 
 const initialForm = {
   date: toDateKey(new Date()),
@@ -34,10 +44,21 @@ const initialForm = {
   password: ""
 };
 
+const initialFixedForm = {
+  weekday: 1,
+  startPeriod: 1,
+  endPeriod: 1,
+  room: ROOMS[0],
+  label: "",
+  password: ""
+};
+
 const messageByCode = {
   DUPLICATE_RESERVATION: "이미 같은 시간에 예약된 특별실입니다.",
   VALIDATION_ERROR: "입력한 내용을 다시 확인해 주세요.",
   INVALID_PASSWORD: "삭제 비밀번호가 맞지 않습니다.",
+  FIXED_SCHEDULE_CONFLICT: "고정 사용 시간이라 예약할 수 없습니다.",
+  DUPLICATE_FIXED_SCHEDULE: "이미 등록된 고정 사용입니다.",
   NOT_FOUND: "예약을 찾을 수 없습니다.",
   CONFIG_MISSING: "구글 앱스 스크립트 주소가 설정되지 않았습니다.",
   GOOGLE_SCRIPT_UNAVAILABLE: "구글 시트 저장소에 연결할 수 없습니다.",
@@ -76,12 +97,15 @@ function renderRoomOptions() {
 
 export default function App() {
   const [reservations, setReservations] = useState([]);
+  const [fixedSchedules, setFixedSchedules] = useState([]);
   const [weekStart, setWeekStart] = useState(() => getStartOfWeek(new Date()));
   const [roomFilter, setRoomFilter] = useState("all");
   const [form, setForm] = useState(initialForm);
+  const [fixedForm, setFixedForm] = useState(initialFixedForm);
   const [message, setMessage] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savingFixedSchedule, setSavingFixedSchedule] = useState(false);
   const [cleaningDuplicates, setCleaningDuplicates] = useState(false);
   const [deletingSelected, setDeletingSelected] = useState(false);
   const [selectedReservationIds, setSelectedReservationIds] = useState(() => new Set());
@@ -109,6 +133,12 @@ export default function App() {
     });
   }, [reservations, roomFilter, weekDays]);
 
+  const visibleFixedSchedules = useMemo(() => {
+    return fixedSchedules.filter((fixedSchedule) => {
+      return roomFilter === "all" || fixedSchedule.room === roomFilter;
+    });
+  }, [fixedSchedules, roomFilter]);
+
   useEffect(() => {
     loadReservations();
   }, []);
@@ -125,7 +155,12 @@ export default function App() {
     setLoading(true);
     setConnectionStatus("checking");
     try {
-      setReservations(await fetchReservations());
+      const [nextReservations, nextFixedSchedules] = await Promise.all([
+        fetchReservations(),
+        fetchFixedSchedules()
+      ]);
+      setReservations(nextReservations);
+      setFixedSchedules(nextFixedSchedules);
       setMessage(null);
       setConnectionStatus("connected");
     } catch (error) {
@@ -137,6 +172,22 @@ export default function App() {
     } finally {
       setLoading(false);
     }
+  }
+
+  function updateFixedForm(field, value) {
+    setFixedForm((current) => {
+      const next = { ...current, [field]: value };
+
+      if (field === "startPeriod" && Number(next.endPeriod) < Number(value)) {
+        next.endPeriod = Number(value);
+      }
+
+      if (field === "endPeriod" && Number(value) < Number(next.startPeriod)) {
+        next.startPeriod = Number(value);
+      }
+
+      return next;
+    });
   }
 
   function updateForm(field, value) {
@@ -189,6 +240,13 @@ export default function App() {
         return;
       }
 
+      const fixedConflict = findFixedScheduleRangeConflict(fixedSchedules, reservationInput);
+
+      if (fixedConflict) {
+        setMessage({ type: "error", text: formatFixedScheduleConflictMessage(fixedConflict) });
+        return;
+      }
+
       const result = await createReservationRangeAndConfirm(reservationInput);
       setReservations(result.reservations);
       setMessage({ type: "success", text: `${getPeriodRangeLabel(selectedPeriods)} 예약되었습니다.` });
@@ -200,6 +258,43 @@ export default function App() {
       });
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleFixedScheduleSubmit(event) {
+    event.preventDefault();
+
+    if (!fixedForm.label.trim()) {
+      setMessage({ type: "error", text: "고정 사용 이름을 입력해 주세요." });
+      return;
+    }
+
+    if (!fixedForm.password.trim()) {
+      setMessage({ type: "error", text: "관리자 비밀번호를 입력해 주세요." });
+      return;
+    }
+
+    setSavingFixedSchedule(true);
+    try {
+      const result = await createFixedScheduleRangeAndConfirm({
+        ...fixedForm,
+        weekday: Number(fixedForm.weekday),
+        startPeriod: Number(fixedForm.startPeriod),
+        endPeriod: Number(fixedForm.endPeriod),
+        label: fixedForm.label.trim(),
+        password: fixedForm.password.trim()
+      });
+
+      setFixedSchedules(result.fixedSchedules);
+      setMessage({ type: "success", text: "고정 사용을 등록했습니다." });
+      setFixedForm((current) => ({ ...current, label: "", password: "" }));
+    } catch (error) {
+      setMessage({
+        type: "error",
+        text: errorMessage(error, "고정 사용을 등록하지 못했습니다.")
+      });
+    } finally {
+      setSavingFixedSchedule(false);
     }
   }
 
@@ -263,6 +358,25 @@ export default function App() {
     }
   }
 
+  async function handleDeleteFixedSchedule(fixedSchedule) {
+    const password = window.prompt(`${getWeekdayLabel(fixedSchedule.weekday)} ${fixedSchedule.period}교시 ${fixedSchedule.room} 고정 사용의 관리자 비밀번호를 입력해 주세요.`);
+
+    if (!password) {
+      return;
+    }
+
+    try {
+      const result = await deleteFixedScheduleAndConfirm(fixedSchedule.id, password);
+      setFixedSchedules(result.fixedSchedules);
+      setMessage({ type: "success", text: "고정 사용을 삭제했습니다." });
+    } catch (error) {
+      setMessage({
+        type: "error",
+        text: errorMessage(error, "고정 사용을 삭제하지 못했습니다.")
+      });
+    }
+  }
+
   function toggleReservationSelection(reservationId) {
     setSelectedReservationIds((current) => {
       const next = new Set(current);
@@ -322,9 +436,29 @@ export default function App() {
       .sort((a, b) => a.room.localeCompare(b.room, "ko-KR"));
   }
 
+  function fixedSchedulesFor(date, period) {
+    const weekday = getWeekdayFromDateKey(date);
+    return visibleFixedSchedules
+      .filter((fixedSchedule) => fixedSchedule.weekday === weekday && fixedSchedule.period === period)
+      .sort((a, b) => a.room.localeCompare(b.room, "ko-KR"));
+  }
+
   function reservationsForDate(date) {
     return visibleReservations
       .filter((reservation) => reservation.date === date)
+      .sort((a, b) => {
+        if (a.period !== b.period) {
+          return a.period - b.period;
+        }
+
+        return a.room.localeCompare(b.room, "ko-KR");
+      });
+  }
+
+  function fixedSchedulesForDate(date) {
+    const weekday = getWeekdayFromDateKey(date);
+    return visibleFixedSchedules
+      .filter((fixedSchedule) => fixedSchedule.weekday === weekday)
       .sort((a, b) => {
         if (a.period !== b.period) {
           return a.period - b.period;
@@ -356,6 +490,25 @@ export default function App() {
           type="button"
           className="delete-button"
           onClick={() => handleDelete(reservation)}
+        >
+          삭제
+        </button>
+      </article>
+    );
+  }
+
+  function renderFixedScheduleItem(fixedSchedule, options = {}) {
+    return (
+      <article className={`fixed-schedule-item ${ROOM_TONE_CLASSES[fixedSchedule.room] ?? ""}`} key={fixedSchedule.id}>
+        <div>
+          <strong>{fixedSchedule.room}</strong>
+          <span>{options.showWeekday ? `${getWeekdayLabel(fixedSchedule.weekday)} ` : ""}{fixedSchedule.period}교시 고정</span>
+          <span>{fixedSchedule.label}</span>
+        </div>
+        <button
+          type="button"
+          className="delete-button"
+          onClick={() => handleDeleteFixedSchedule(fixedSchedule)}
         >
           삭제
         </button>
@@ -465,14 +618,16 @@ export default function App() {
                       <th>{period}교시</th>
                       {weekDays.map((day) => {
                         const dayReservations = reservationsFor(day.key, period);
+                        const dayFixedSchedules = fixedSchedulesFor(day.key, period);
                         return (
                           <td className={day.key === todayKey ? "today-cell" : ""} key={`${day.key}-${period}`}>
                             {loading ? (
                               <span className="muted">불러오는 중</span>
-                            ) : dayReservations.length === 0 ? (
+                            ) : dayReservations.length === 0 && dayFixedSchedules.length === 0 ? (
                               <span className="empty-slot">비어 있음</span>
                             ) : (
                               <div className="reservation-list">
+                                {dayFixedSchedules.map(renderFixedScheduleItem)}
                                 {dayReservations.map(renderReservationItem)}
                               </div>
                             )}
@@ -488,6 +643,7 @@ export default function App() {
             <div className={`daily-list ${viewMode === "list" ? "" : "is-hidden"}`} aria-label="날짜별 예약 목록">
               {weekDays.map((day, index) => {
                 const dayReservations = reservationsForDate(day.key);
+                const dayFixedSchedules = fixedSchedulesForDate(day.key);
                 return (
                   <section className={`daily-column ${day.key === todayKey ? "today-card" : ""}`} key={day.key}>
                     <h3>
@@ -496,10 +652,16 @@ export default function App() {
                     </h3>
                     {loading ? (
                       <span className="muted">불러오는 중</span>
-                    ) : dayReservations.length === 0 ? (
+                    ) : dayReservations.length === 0 && dayFixedSchedules.length === 0 ? (
                       <span className="empty-slot">예약 없음</span>
                     ) : (
                       <div className="reservation-list">
+                        {dayFixedSchedules.map((fixedSchedule) => (
+                          <div className="daily-reservation" key={fixedSchedule.id}>
+                            <span>{fixedSchedule.period}교시</span>
+                            {renderFixedScheduleItem(fixedSchedule)}
+                          </div>
+                        ))}
                         {dayReservations.map((reservation) => (
                           <div className="daily-reservation" key={reservation.id}>
                             <span>{reservation.period}교시</span>
@@ -634,6 +796,91 @@ export default function App() {
               >
                 {cleaningDuplicates ? "정리 중" : "중복 정리"}
               </button>
+            </section>
+
+            <section className="admin-panel" aria-label="고정 사용 관리">
+              <div>
+                <p className="eyebrow">고정 사용</p>
+                <h2>고정 사용 등록</h2>
+              </div>
+
+              <form onSubmit={handleFixedScheduleSubmit}>
+                <label>
+                  요일
+                  <select value={fixedForm.weekday} onChange={(event) => updateFixedForm("weekday", event.target.value)}>
+                    {WEEKDAY_OPTIONS.map((weekday) => (
+                      <option key={weekday.value} value={weekday.value}>
+                        {weekday.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <div className="form-row">
+                  <label>
+                    시작 교시
+                    <select value={fixedForm.startPeriod} onChange={(event) => updateFixedForm("startPeriod", event.target.value)}>
+                      {PERIODS.map((period) => (
+                        <option key={period} value={period}>
+                          {period}교시
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label>
+                    끝 교시
+                    <select value={fixedForm.endPeriod} onChange={(event) => updateFixedForm("endPeriod", event.target.value)}>
+                      {PERIODS.filter((period) => period >= Number(fixedForm.startPeriod)).map((period) => (
+                        <option key={period} value={period}>
+                          {period}교시
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+
+                <label>
+                  특별실
+                  <select value={fixedForm.room} onChange={(event) => updateFixedForm("room", event.target.value)}>
+                    {renderRoomOptions()}
+                  </select>
+                </label>
+
+                <label>
+                  사용 이름
+                  <input
+                    type="text"
+                    value={fixedForm.label}
+                    onChange={(event) => updateFixedForm("label", event.target.value)}
+                    placeholder="예: 3학년 음악"
+                    required
+                  />
+                </label>
+
+                <label>
+                  관리자 비밀번호
+                  <input
+                    type="password"
+                    value={fixedForm.password}
+                    onChange={(event) => updateFixedForm("password", event.target.value)}
+                    minLength={2}
+                    required
+                  />
+                </label>
+
+                <button type="submit" className="primary-button" disabled={savingFixedSchedule}>
+                  {savingFixedSchedule ? "등록 중" : "고정 사용 등록"}
+                </button>
+              </form>
+
+              <div className="fixed-schedule-list" aria-label="등록된 고정 사용">
+                {fixedSchedules.length === 0 ? (
+                  <p className="duplicate-summary">등록된 고정 사용 없음</p>
+                ) : (
+                  fixedSchedules.map((fixedSchedule) => renderFixedScheduleItem(fixedSchedule, { showWeekday: true }))
+                )}
+              </div>
             </section>
           </aside>
         </div>

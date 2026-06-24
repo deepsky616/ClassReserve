@@ -15,6 +15,15 @@ export function createReservationApp({ store }) {
     }
   });
 
+  app.get("/api/fixed-schedules", async (request, response, next) => {
+    try {
+      const fixedSchedules = await store.listFixedSchedules();
+      response.json({ fixedSchedules });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   app.post("/api/reservations", async (request, response, next) => {
     try {
       const reservation = await store.createReservation(request.body);
@@ -33,9 +42,27 @@ export function createReservationApp({ store }) {
     }
   });
 
+  app.post("/api/fixed-schedules/batch", async (request, response, next) => {
+    try {
+      const fixedSchedules = await store.createFixedSchedules(request.body?.schedules);
+      response.status(201).json({ fixedSchedules });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   app.delete("/api/reservations/:id", async (request, response, next) => {
     try {
       const result = await store.deleteReservation(request.params.id, request.body?.password);
+      response.json(result);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.delete("/api/fixed-schedules/:id", async (request, response, next) => {
+    try {
+      const result = await store.deleteFixedSchedule(request.params.id, request.body?.password);
       response.json(result);
     } catch (error) {
       next(error);
@@ -55,6 +82,10 @@ export function createReservationApp({ store }) {
 
     if (error.conflictReservation) {
       body.conflictReservation = error.conflictReservation;
+    }
+
+    if (error.conflictFixedSchedule) {
+      body.conflictFixedSchedule = error.conflictFixedSchedule;
     }
 
     response.status(error.status ?? 500).json(body);
