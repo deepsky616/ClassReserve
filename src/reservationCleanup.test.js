@@ -63,6 +63,59 @@ test("특별실이 다르면 중복 정리 대상이 아니다", () => {
   assert.deepEqual(getDuplicateReservationGroups(reservations), []);
 });
 
+test("체육관은 같은 시간 두 건까지 중복 정리 대상이 아니다", () => {
+  const reservations = [
+    {
+      ...baseReservation,
+      id: "gym-early",
+      room: "체육관",
+      createdAt: "2026-06-10T09:01:00.000Z"
+    },
+    {
+      ...baseReservation,
+      id: "gym-second",
+      room: "체육관",
+      grade: 2,
+      classNumber: 1,
+      createdAt: "2026-06-10T09:02:00.000Z"
+    }
+  ];
+
+  assert.deepEqual(getDuplicateReservationGroups(reservations), []);
+});
+
+test("체육관은 같은 시간 세 번째 예약부터 중복 정리 대상이다", () => {
+  const reservations = [
+    {
+      ...baseReservation,
+      id: "gym-early",
+      room: "체육관",
+      createdAt: "2026-06-10T09:01:00.000Z"
+    },
+    {
+      ...baseReservation,
+      id: "gym-second",
+      room: "체육관",
+      grade: 2,
+      classNumber: 1,
+      createdAt: "2026-06-10T09:02:00.000Z"
+    },
+    {
+      ...baseReservation,
+      id: "gym-third",
+      room: "체육관",
+      grade: 3,
+      classNumber: 1,
+      createdAt: "2026-06-10T09:03:00.000Z"
+    }
+  ];
+
+  const groups = getDuplicateReservationGroups(reservations);
+
+  assert.equal(groups.length, 1);
+  assert.deepEqual(groups[0].duplicates.map((reservation) => reservation.id), ["gym-third"]);
+});
+
 test("유치원 예약도 같은 시간과 특별실이면 중복 삭제 후보에 포함한다", () => {
   const reservations = [
     {

@@ -59,6 +59,44 @@ test("같은 날짜와 교시와 특별실은 중복 예약할 수 없다", asyn
   });
 });
 
+test("체육관은 같은 날짜와 교시에 두 번째 예약까지 저장할 수 있다", async () => {
+  await withStore(async (store) => {
+    await store.createReservation({ ...validInput, room: "체육관" });
+    await store.createReservation({ ...validInput, room: "체육관", grade: 5, classNumber: 1 });
+
+    const reservations = await store.listReservations();
+    assert.equal(reservations.length, 2);
+    assert.deepEqual(reservations.map((reservation) => reservation.room), ["체육관", "체육관"]);
+  }, {
+    id: (() => {
+      let nextId = 1;
+      return () => `reservation-${nextId++}`;
+    })()
+  });
+});
+
+test("체육관은 같은 날짜와 교시에 세 번째 예약부터 거부한다", async () => {
+  await withStore(async (store) => {
+    await store.createReservation({ ...validInput, room: "체육관" });
+    await store.createReservation({ ...validInput, room: "체육관", grade: 5, classNumber: 1 });
+
+    await assert.rejects(
+      () => store.createReservation({ ...validInput, room: "체육관", grade: 6, classNumber: 1 }),
+      {
+        code: "DUPLICATE_RESERVATION",
+        message: "이미 3학년 4반 외 1건이 먼저 예약해서 예약할 수 없습니다."
+      }
+    );
+
+    assert.equal((await store.listReservations()).length, 2);
+  }, {
+    id: (() => {
+      let nextId = 1;
+      return () => `reservation-${nextId++}`;
+    })()
+  });
+});
+
 test("여러 교시 예약은 모두 저장되거나 모두 거부된다", async () => {
   await withStore(async (store) => {
     const created = await store.createReservations([

@@ -50,6 +50,49 @@ test("범위 안의 한 교시라도 겹치면 기존 예약을 찾는다", () =
   assert.equal(conflict, existingReservation);
 });
 
+test("체육관은 같은 날짜와 교시에 두 번째 예약까지 허용한다", () => {
+  const gymReservation = {
+    ...existingReservation,
+    id: "gym-1",
+    room: "체육관"
+  };
+  const conflict = findReservationConflict([gymReservation], {
+    date: "2026-06-19",
+    period: 2,
+    room: "체육관",
+    grade: 5,
+    classNumber: 1
+  });
+
+  assert.equal(conflict, null);
+});
+
+test("체육관은 같은 날짜와 교시에 세 번째 예약부터 막는다", () => {
+  const gymReservations = [
+    {
+      ...existingReservation,
+      id: "gym-1",
+      room: "체육관"
+    },
+    {
+      ...existingReservation,
+      id: "gym-2",
+      room: "체육관",
+      grade: 4,
+      classNumber: 2
+    }
+  ];
+  const conflict = findReservationConflict(gymReservations, {
+    date: "2026-06-19",
+    period: 2,
+    room: "체육관",
+    grade: 5,
+    classNumber: 1
+  });
+
+  assert.equal(conflict, gymReservations[0]);
+});
+
 test("기존 예약자를 포함한 예약 불가 메시지를 만든다", () => {
   assert.equal(
     formatReservationConflictMessage(existingReservation),
