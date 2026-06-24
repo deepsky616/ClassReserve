@@ -31,7 +31,7 @@ async function withTestServer(run) {
 const reservationInput = {
   date: "2026-06-15",
   period: 1,
-  room: "컴퓨터실(4층)",
+  room: "컴퓨터실",
   grade: 4,
   classNumber: 2,
   password: "2468"
@@ -57,7 +57,7 @@ test("예약을 만들고 삭제 비밀번호 확인값은 응답하지 않는�
     const body = await response.json();
 
     assert.equal(response.status, 201);
-    assert.equal(body.reservation.room, "컴퓨터실(4층)");
+    assert.equal(body.reservation.room, "컴퓨터실");
     assert.equal(body.reservation.passwordHash, undefined);
   });
 });

@@ -11,7 +11,7 @@ const reservations = [
     id: "reservation-1",
     date: "2026-06-24",
     period: 1,
-    room: "창의놀이실(1층)",
+    room: "창의놀이실",
     grade: 1,
     classNumber: 1
   },
@@ -19,7 +19,7 @@ const reservations = [
     id: "reservation-2",
     date: "2026-06-24",
     period: 2,
-    room: "창의놀이실(1층)",
+    room: "창의놀이실",
     grade: 1,
     classNumber: 1
   },
@@ -58,5 +58,5 @@ test("다른 날짜 예약이 섞이면 검증 오류를 낸다", () => {
 test("선택 삭제 확인 문구를 만든다", () => {
   const summary = formatSelectedReservationSummary(reservations.slice(0, 2));
 
-  assert.equal(summary, "2026-06-24 창의놀이실(1층) 1교시, 2교시 2건");
+  assert.equal(summary, "2026-06-24 창의놀이실 1교시, 2교시 2건");
 });

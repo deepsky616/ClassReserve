@@ -8,7 +8,7 @@ import {
 const baseReservation = {
   date: "2026-06-19",
   period: 1,
-  room: "컴퓨터실(4층)",
+  room: "컴퓨터실",
   grade: 1,
   classNumber: 1
 };

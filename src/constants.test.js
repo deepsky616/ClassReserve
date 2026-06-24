@@ -4,13 +4,13 @@ import { CLASS_OPTIONS_BY_GRADE, GRADES, ROOM_TONE_CLASSES, ROOMS } from "./cons
 
 test("특별실 목록은 최신 학교 목록과 일치한다", () => {
   assert.deepEqual(ROOMS, [
-    "창의놀이실(1층)",
-    "신체활동실(1층)",
-    "AI캠퍼스(2층)",
-    "음악실(2층)",
-    "다모임실(2층)",
-    "체육관(3층)",
-    "컴퓨터실(4층)"
+    "창의놀이실",
+    "신체활동실",
+    "AI캠퍼스",
+    "음악실",
+    "다모임실",
+    "체육관",
+    "컴퓨터실"
   ]);
 });
 
