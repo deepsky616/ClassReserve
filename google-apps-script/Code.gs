@@ -3,6 +3,9 @@ const FIXED_SCHEDULE_SHEET_NAME = "fixed_schedules";
 const SPREADSHEET_ID_PROPERTY = "SPREADSHEET_ID";
 const ADMIN_DELETE_PASSWORD_PROPERTY = "ADMIN_DELETE_PASSWORD";
 const ALLOWED_ROOMS = ["창의놀이실", "신체활동실", "AI캠퍼스", "음악실", "다모임실", "체육관", "컴퓨터실"];
+const GYM_ROOM = "체육관";
+const DEFAULT_ROOM_RESERVATION_LIMIT = 1;
+const GYM_RESERVATION_LIMIT = 2;
 const ROOM_ALIASES = {
   "AI실": "AI캠퍼스"
 };
@@ -161,12 +164,11 @@ function createReservations(inputs) {
         throw createError(formatFixedScheduleConflictMessage(fixedConflict), "FIXED_SCHEDULE_CONFLICT");
       }
 
-      const duplicate = rows.concat(createdReservations).find(function (reservation) {
-        return isSameSlot(reservation, input);
-      });
+      const sameSlotReservations = getSameSlotReservations(rows.concat(createdReservations), input);
+      const duplicate = sameSlotReservations.length >= getRoomReservationLimit(input.room) ? sameSlotReservations[0] : null;
 
       if (duplicate) {
-        throw createError("이미 " + formatReservationOwner(duplicate) + "이 먼저 예약해서 예약할 수 없습니다.", "DUPLICATE_RESERVATION");
+        throw createError(formatSlotConflictMessage(sameSlotReservations), "DUPLICATE_RESERVATION");
       }
 
       createdReservations.push({
@@ -639,6 +641,16 @@ function isSameSlot(reservation, input) {
   );
 }
 
+function getRoomReservationLimit(room) {
+  return normalizeRoomName(room) === GYM_ROOM ? GYM_RESERVATION_LIMIT : DEFAULT_ROOM_RESERVATION_LIMIT;
+}
+
+function getSameSlotReservations(reservations, input) {
+  return reservations.filter(function (reservation) {
+    return isSameSlot(reservation, input);
+  });
+}
+
 function isSameFixedScheduleSlot(left, right) {
   return (
     Number(left.weekday) === Number(right.weekday) &&
@@ -731,6 +743,13 @@ function formatReservationOwner(reservation) {
   }
 
   return grade + "학년 " + Number(reservation.classNumber) + "반";
+}
+
+function formatSlotConflictMessage(conflictingReservations) {
+  const firstReservation = conflictingReservations[0];
+  const extraCount = conflictingReservations.length - 1;
+  const extraText = extraCount > 0 ? " 외 " + extraCount + "건" : "";
+  return "이미 " + formatReservationOwner(firstReservation) + extraText + "이 먼저 예약해서 예약할 수 없습니다.";
 }
 
 function hashPassword(password) {

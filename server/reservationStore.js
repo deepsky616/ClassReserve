@@ -11,6 +11,10 @@ import {
 } from "../src/reservationRules.js";
 import { isAllowedRoom, normalizeRoomName } from "../src/roomUtils.js";
 import {
+  getRoomReservationLimit,
+  getSameSlotReservations
+} from "../src/reservationCapacity.js";
+import {
   findFixedScheduleRangeConflict,
   formatFixedScheduleConflictMessage,
   isSameFixedScheduleSlot,
@@ -110,11 +114,12 @@ export function createReservationStore(options = {}) {
         );
       }
 
-      const duplicate = [...reservations, ...createdReservations].find((reservation) => isSameSlot(reservation, input));
+      const sameSlotReservations = getSameSlotReservations([...reservations, ...createdReservations], input);
+      const duplicate = sameSlotReservations.length >= getRoomReservationLimit(input.room) ? sameSlotReservations[0] : null;
 
       if (duplicate) {
         throw createError(
-          `이미 ${formatReservationOwner(duplicate)}이 먼저 예약해서 예약할 수 없습니다.`,
+          formatSlotConflictMessage(sameSlotReservations),
           "DUPLICATE_RESERVATION",
           409,
           { conflictReservation: stripPrivateFields(duplicate) }
@@ -334,12 +339,11 @@ function isValidGrade(value) {
   return value === KINDERGARTEN_GRADE || isNumberInRange(value, 1, 6);
 }
 
-function isSameSlot(reservation, input) {
-  return (
-    reservation.date === input.date &&
-    Number(reservation.period) === Number(input.period) &&
-    normalizeRoomName(reservation.room) === normalizeRoomName(input.room)
-  );
+function formatSlotConflictMessage(conflictingReservations) {
+  const firstReservation = conflictingReservations[0];
+  const extraCount = conflictingReservations.length - 1;
+  const extraText = extraCount > 0 ? ` 외 ${extraCount}건` : "";
+  return `이미 ${formatReservationOwner(firstReservation)}${extraText}이 먼저 예약해서 예약할 수 없습니다.`;
 }
 
 function formatReservationOwner(reservation) {

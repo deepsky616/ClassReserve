@@ -1,3 +1,5 @@
+import { getRoomReservationLimit } from "./reservationCapacity.js";
+
 function getSlotKey(reservation) {
   return [
     reservation.date,
@@ -32,10 +34,14 @@ export function getDuplicateReservationGroups(reservations) {
   });
 
   return [...grouped.entries()]
-    .filter(([, group]) => group.length > 1)
+    .filter(([, group]) => {
+      const room = group[0].reservation.room;
+      return group.length > getRoomReservationLimit(room);
+    })
     .map(([key, group]) => {
       const sorted = [...group].sort(byFirstCreatedThenInputOrder).map((entry) => entry.reservation);
       const keeper = sorted[0];
+      const roomLimit = getRoomReservationLimit(keeper.room);
 
       return {
         key,
@@ -43,7 +49,7 @@ export function getDuplicateReservationGroups(reservations) {
         period: Number(keeper.period),
         room: keeper.room,
         keeper,
-        duplicates: sorted.slice(1),
+        duplicates: sorted.slice(roomLimit),
         reservations: sorted
       };
     })

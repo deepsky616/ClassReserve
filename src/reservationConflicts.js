@@ -1,14 +1,13 @@
 import { formatReservationOwner } from "./reservationLabels.js";
 import { getPeriodRange } from "./periodRange.js";
+import {
+  getRoomReservationLimit,
+  getSameSlotReservations
+} from "./reservationCapacity.js";
 
 export function findReservationConflict(reservations, input) {
-  return reservations.find((reservation) => {
-    return (
-      reservation.date === input.date &&
-      Number(reservation.period) === Number(input.period) &&
-      reservation.room === input.room
-    );
-  }) ?? null;
+  const sameSlotReservations = getSameSlotReservations(reservations, input);
+  return sameSlotReservations.length >= getRoomReservationLimit(input.room) ? sameSlotReservations[0] : null;
 }
 
 export function findReservationRangeConflict(reservations, input) {
