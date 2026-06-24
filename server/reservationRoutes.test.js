@@ -93,6 +93,51 @@ test("고정 사용을 만들고 조회하고 삭제한다", async () => {
   });
 });
 
+test("여러 고정 사용을 한 번에 삭제한다", async () => {
+  await withTestServer(async (baseUrl) => {
+    const createResponse = await fetch(`${baseUrl}/api/fixed-schedules/batch`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        schedules: [
+          {
+            weekday: 1,
+            period: 2,
+            room: "음악실",
+            label: "3학년 음악",
+            password: "admin-pass"
+          },
+          {
+            weekday: 1,
+            period: 3,
+            room: "음악실",
+            label: "3학년 음악",
+            password: "admin-pass"
+          }
+        ]
+      })
+    });
+    const createBody = await createResponse.json();
+    const ids = createBody.fixedSchedules.map((fixedSchedule) => fixedSchedule.id);
+
+    const deleteResponse = await fetch(`${baseUrl}/api/fixed-schedules/batch-delete`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids, password: "admin-pass" })
+    });
+    const deleteBody = await deleteResponse.json();
+
+    assert.equal(deleteResponse.status, 200);
+    assert.equal(deleteBody.deleted, true);
+    assert.equal(deleteBody.deletedCount, 2);
+
+    const listResponse = await fetch(`${baseUrl}/api/fixed-schedules`);
+    const listBody = await listResponse.json();
+
+    assert.deepEqual(listBody.fixedSchedules, []);
+  });
+});
+
 test("예약을 만들고 삭제 비밀번호 확인값은 응답하지 않는다", async () => {
   await withTestServer(async (baseUrl) => {
     const response = await fetch(`${baseUrl}/api/reservations`, {

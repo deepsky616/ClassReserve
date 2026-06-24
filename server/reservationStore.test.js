@@ -359,3 +359,42 @@ test("고정 사용은 관리자 비밀번호로 삭제한다", async () => {
     assert.deepEqual(await store.listFixedSchedules(), []);
   }, { adminPassword: "admin-pass" });
 });
+
+test("여러 고정 사용은 관리자 비밀번호로 한 번에 삭제한다", async () => {
+  await withStore(async (store) => {
+    const created = await store.createFixedSchedules([
+      {
+        weekday: 1,
+        period: 2,
+        room: "음악실",
+        label: "3학년 음악",
+        password: "admin-pass"
+      },
+      {
+        weekday: 1,
+        period: 3,
+        room: "음악실",
+        label: "3학년 음악",
+        password: "admin-pass"
+      }
+    ]);
+
+    await assert.rejects(
+      () => store.deleteFixedSchedules(created.map((fixedSchedule) => fixedSchedule.id), "wrong"),
+      { code: "INVALID_PASSWORD" }
+    );
+
+    assert.equal((await store.listFixedSchedules()).length, 2);
+
+    const result = await store.deleteFixedSchedules(created.map((fixedSchedule) => fixedSchedule.id), "admin-pass");
+
+    assert.equal(result.deletedCount, 2);
+    assert.deepEqual(await store.listFixedSchedules(), []);
+  }, {
+    adminPassword: "admin-pass",
+    id: (() => {
+      let nextId = 1;
+      return () => `fixed-${nextId++}`;
+    })()
+  });
+});

@@ -8,6 +8,7 @@ import {
   deleteReservation,
   deleteReservationAndConfirm,
   deleteFixedScheduleAndConfirm,
+  deleteFixedSchedulesAndConfirm,
   deleteReservationsAndConfirm,
   fetchFixedSchedules,
   fetchReservations
@@ -600,6 +601,85 @@ test("고정 사용 삭제 후 한 번의 요청으로 실제 삭제 여부를 �
 
     assert.equal(result.deleted, true);
     assert.deepEqual(result.fixedSchedules, []);
+  } finally {
+    harness.restore();
+  }
+});
+
+test("여러 고정 사용 삭제 후 한 번의 요청으로 실제 삭제 여부를 확인한다", async () => {
+  const actions = [];
+  const harness = installJsonpDomHarness((url) => {
+    const payload = JSON.parse(url.searchParams.get("payload"));
+    actions.push(payload.action);
+
+    assert.equal(payload.action, "deleteFixedSchedulesAndList");
+    assert.deepEqual(payload.ids, ["fixed-1", "fixed-2"]);
+    assert.equal(payload.password, "admin-pass");
+
+    return {
+      ok: true,
+      deleted: true,
+      deletedCount: 2,
+      fixedSchedules: [
+        {
+          id: "fixed-3",
+          weekday: 3,
+          period: 4,
+          room: "체육관",
+          label: "5학년 체육",
+          createdAt: "2026-06-10T00:00:00.000Z"
+        }
+      ]
+    };
+  });
+
+  try {
+    const result = await deleteFixedSchedulesAndConfirm(["fixed-1", "fixed-2"], "admin-pass", {
+      scriptUrl: "https://script.google.com/macros/s/example/exec"
+    });
+
+    assert.equal(result.deleted, true);
+    assert.equal(result.deletedCount, 2);
+    assert.deepEqual(result.fixedSchedules.map((fixedSchedule) => fixedSchedule.id), ["fixed-3"]);
+    assert.deepEqual(actions, ["deleteFixedSchedulesAndList"]);
+  } finally {
+    harness.restore();
+  }
+});
+
+test("여러 고정 사용 삭제 뒤 하나라도 남아 있으면 삭제 확인 실패로 분류한다", async () => {
+  const harness = installJsonpDomHarness((url) => {
+    const payload = JSON.parse(url.searchParams.get("payload"));
+
+    assert.equal(payload.action, "deleteFixedSchedulesAndList");
+
+    return {
+      ok: true,
+      deleted: true,
+      deletedCount: 2,
+      fixedSchedules: [
+        {
+          id: "fixed-2",
+          weekday: 1,
+          period: 3,
+          room: "음악실",
+          label: "3학년 음악",
+          createdAt: "2026-06-10T00:00:00.000Z"
+        }
+      ]
+    };
+  });
+
+  try {
+    await assert.rejects(
+      () => deleteFixedSchedulesAndConfirm(["fixed-1", "fixed-2"], "admin-pass", {
+        scriptUrl: "https://script.google.com/macros/s/example/exec"
+      }),
+      {
+        code: "DELETE_UNCONFIRMED",
+        message: "고정 사용 삭제를 확인하지 못했습니다. 저장소 배포 상태를 확인해 주세요."
+      }
+    );
   } finally {
     harness.restore();
   }
