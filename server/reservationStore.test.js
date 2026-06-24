@@ -184,6 +184,15 @@ test("목록에 없는 특별실은 예약할 수 없다", async () => {
   });
 });
 
+test("삭제된 청계누리는 예약할 수 없다", async () => {
+  await withStore(async (store) => {
+    await assert.rejects(
+      () => store.createReservation({ ...validInput, room: "청계누리(강당)" }),
+      { code: "VALIDATION_ERROR" }
+    );
+  });
+});
+
 test("새 특별실 목록의 컴퓨터실과 AI캠퍼스와 신체활동실과 체육관을 예약할 수 있다", async () => {
   await withStore(async (store) => {
     const computerRoom = await store.createReservation({

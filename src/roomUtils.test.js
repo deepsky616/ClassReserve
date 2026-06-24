@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ROOM_GROUPS, normalizeRoomName } from "./roomUtils.js";
+import { ROOM_GROUPS, isAllowedRoom, normalizeRoomName } from "./roomUtils.js";
 
 test("이전 특별실 이름을 새 층수 이름으로 정규화한다", () => {
   assert.equal(normalizeRoomName("음악실"), "음악실(2층)");
@@ -27,10 +27,10 @@ test("특별실을 층수 오름차순 묶음으로 제공한다", () => {
     {
       label: "4층",
       rooms: ["컴퓨터실(4층)"]
-    },
-    {
-      label: "기타",
-      rooms: ["청계누리(강당)"]
     }
   ]);
+});
+
+test("삭제된 청계누리는 예약 가능한 특별실로 취급하지 않는다", () => {
+  assert.equal(isAllowedRoom("청계누리(강당)"), false);
 });
