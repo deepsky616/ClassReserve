@@ -1,14 +1,9 @@
 const SHEET_NAME = "reservations";
 const SPREADSHEET_ID_PROPERTY = "SPREADSHEET_ID";
 const ADMIN_DELETE_PASSWORD_PROPERTY = "ADMIN_DELETE_PASSWORD";
-const ALLOWED_ROOMS = ["창의놀이실(1층)", "신체활동실(1층)", "AI캠퍼스(2층)", "음악실(2층)", "다모임실(2층)", "체육관(3층)", "컴퓨터실(4층)"];
+const ALLOWED_ROOMS = ["창의놀이실", "신체활동실", "AI캠퍼스", "음악실", "다모임실", "체육관", "컴퓨터실"];
 const ROOM_ALIASES = {
-  "창의놀이실": "창의놀이실(1층)",
-  "AI실": "AI캠퍼스(2층)",
-  "AI실(2층)": "AI캠퍼스(2층)",
-  "음악실": "음악실(2층)",
-  "다모임실": "다모임실(2층)",
-  "체육관": "체육관(3층)"
+  "AI실": "AI캠퍼스"
 };
 const KINDERGARTEN_GRADE = "유치원";
 const RESERVATION_WINDOW_DAYS = 56;
@@ -390,7 +385,7 @@ function isSameSlot(reservation, input) {
 }
 
 function normalizeRoomName(room) {
-  const value = String(room);
+  const value = String(room).replace(/\([1-4]층\)/g, "");
   return ROOM_ALIASES[value] || value;
 }
 

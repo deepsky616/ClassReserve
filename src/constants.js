@@ -19,13 +19,13 @@ export const CLASS_OPTIONS_BY_GRADE = {
 };
 
 export const ROOM_TONE_CLASSES = {
-  "창의놀이실(1층)": "tone-play",
-  "신체활동실(1층)": "tone-activity",
-  "AI캠퍼스(2층)": "tone-ai",
-  "음악실(2층)": "tone-music",
-  "다모임실(2층)": "tone-meeting",
-  "체육관(3층)": "tone-gym",
-  "컴퓨터실(4층)": "tone-computer"
+  "창의놀이실": "tone-play",
+  "신체활동실": "tone-activity",
+  "AI캠퍼스": "tone-ai",
+  "음악실": "tone-music",
+  "다모임실": "tone-meeting",
+  "체육관": "tone-gym",
+  "컴퓨터실": "tone-computer"
 };
 
 export const WEEKDAY_LABELS = ["월", "화", "수", "목", "금"];
