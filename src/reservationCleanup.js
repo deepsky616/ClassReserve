@@ -1,10 +1,11 @@
 import { getRoomReservationLimit } from "./reservationCapacity.js";
+import { normalizeRoomName } from "./roomUtils.js";
 
 function getSlotKey(reservation) {
   return [
     reservation.date,
     Number(reservation.period),
-    reservation.room
+    normalizeRoomName(reservation.room)
   ].join("|");
 }
 
@@ -35,19 +36,20 @@ export function getDuplicateReservationGroups(reservations) {
 
   return [...grouped.entries()]
     .filter(([, group]) => {
-      const room = group[0].reservation.room;
+      const room = normalizeRoomName(group[0].reservation.room);
       return group.length > getRoomReservationLimit(room);
     })
     .map(([key, group]) => {
       const sorted = [...group].sort(byFirstCreatedThenInputOrder).map((entry) => entry.reservation);
       const keeper = sorted[0];
-      const roomLimit = getRoomReservationLimit(keeper.room);
+      const room = normalizeRoomName(keeper.room);
+      const roomLimit = getRoomReservationLimit(room);
 
       return {
         key,
         date: keeper.date,
         period: Number(keeper.period),
-        room: keeper.room,
+        room,
         keeper,
         duplicates: sorted.slice(roomLimit),
         reservations: sorted

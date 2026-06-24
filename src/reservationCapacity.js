@@ -1,6 +1,6 @@
 import { normalizeRoomName } from "./roomUtils.js";
 
-export const GYM_ROOM = "체육관";
+export const GYM_ROOM = "청계누리(강당)";
 export const DEFAULT_ROOM_RESERVATION_LIMIT = 1;
 export const GYM_RESERVATION_LIMIT = 2;
 

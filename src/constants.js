@@ -22,10 +22,13 @@ export const ROOM_TONE_CLASSES = {
   "창의놀이실": "tone-play",
   "신체활동실": "tone-activity",
   "AI캠퍼스": "tone-ai",
-  "음악실": "tone-music",
   "다모임실": "tone-meeting",
-  "체육관": "tone-gym",
-  "컴퓨터실": "tone-computer"
+  "청계누리(강당)": "tone-gym",
+  "동아리1": "tone-club",
+  "동아리2": "tone-club",
+  "컴퓨터실": "tone-computer",
+  "다목적실": "tone-purpose",
+  "음악실": "tone-music"
 };
 
 export const WEEKDAY_LABELS = ["월", "화", "수", "목", "금"];

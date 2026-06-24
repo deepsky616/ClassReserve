@@ -393,6 +393,18 @@ button:focus-visible {
   background: #e2e8f0;
 }
 
+.reservation-item.tone-club,
+.fixed-schedule-item.tone-club {
+  border-left-color: #7c3aed;
+  background: #ede9fe;
+}
+
+.reservation-item.tone-purpose,
+.fixed-schedule-item.tone-purpose {
+  border-left-color: #a16207;
+  background: #fef3c7;
+}
+
 .reservation-item strong,
 .reservation-item span,
 .fixed-schedule-item strong,
