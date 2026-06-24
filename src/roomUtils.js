@@ -14,10 +14,6 @@ export const ROOM_GROUPS = [
   {
     label: "4층",
     rooms: ["컴퓨터실(4층)"]
-  },
-  {
-    label: "기타",
-    rooms: ["청계누리(강당)"]
   }
 ];
 

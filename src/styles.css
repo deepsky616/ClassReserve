@@ -339,11 +339,6 @@ button:focus-visible {
   width: 18px;
 }
 
-.reservation-item.tone-hall {
-  border-left-color: #7c3aed;
-  background: #ede9fe;
-}
-
 .reservation-item.tone-computer {
   border-left-color: #2563eb;
   background: #dbeafe;

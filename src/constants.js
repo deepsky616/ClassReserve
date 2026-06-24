@@ -25,8 +25,7 @@ export const ROOM_TONE_CLASSES = {
   "음악실(2층)": "tone-music",
   "다모임실(2층)": "tone-meeting",
   "체육관(3층)": "tone-gym",
-  "컴퓨터실(4층)": "tone-computer",
-  "청계누리(강당)": "tone-hall"
+  "컴퓨터실(4층)": "tone-computer"
 };
 
 export const WEEKDAY_LABELS = ["월", "화", "수", "목", "금"];
