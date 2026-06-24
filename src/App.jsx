@@ -5,7 +5,7 @@ import {
   deleteReservationsAndConfirm,
   fetchReservations
 } from "./api.js";
-import { GRADES, KINDERGARTEN_GRADE, PERIODS, ROOM_TONE_CLASSES, ROOMS, WEEKDAY_LABELS } from "./constants.js";
+import { GRADES, KINDERGARTEN_GRADE, PERIODS, ROOM_GROUPS, ROOM_TONE_CLASSES, ROOMS, WEEKDAY_LABELS } from "./constants.js";
 import { addWeeks, formatWeekRange, getStartOfWeek, getWeekDays, toDateKey } from "./dateUtils.js";
 import { getPeriodRange, getPeriodRangeLabel } from "./periodRange.js";
 import { formatReservationOwner } from "./reservationLabels.js";
@@ -60,6 +60,18 @@ function normalizeGradeForSubmit(grade) {
 
 function gradeLabel(grade) {
   return grade === KINDERGARTEN_GRADE ? KINDERGARTEN_GRADE : `${grade}학년`;
+}
+
+function renderRoomOptions() {
+  return ROOM_GROUPS.map((group) => (
+    <optgroup key={group.label} label={group.label}>
+      {group.rooms.map((room) => (
+        <option key={room} value={room}>
+          {room}
+        </option>
+      ))}
+    </optgroup>
+  ));
 }
 
 export default function App() {
@@ -388,11 +400,7 @@ export default function App() {
                 특별실
                 <select value={roomFilter} onChange={(event) => setRoomFilter(event.target.value)}>
                   <option value="all">전체</option>
-                  {ROOMS.map((room) => (
-                    <option key={room} value={room}>
-                      {room}
-                    </option>
-                  ))}
+                  {renderRoomOptions()}
                 </select>
               </label>
 
@@ -554,11 +562,7 @@ export default function App() {
               <label>
                 특별실
                 <select value={form.room} onChange={(event) => updateForm("room", event.target.value)}>
-                  {ROOMS.map((room) => (
-                    <option key={room} value={room}>
-                      {room}
-                    </option>
-                  ))}
+                  {renderRoomOptions()}
                 </select>
               </label>
 

@@ -1,4 +1,4 @@
-export { ROOMS } from "./roomUtils.js";
+export { ROOM_GROUPS, ROOMS } from "./roomUtils.js";
 
 export const PERIODS = [1, 2, 3, 4, 5, 6];
 
@@ -20,13 +20,13 @@ export const CLASS_OPTIONS_BY_GRADE = {
 
 export const ROOM_TONE_CLASSES = {
   "창의놀이실(1층)": "tone-play",
-  "청계누리(강당)": "tone-hall",
-  "컴퓨터실(4층)": "tone-computer",
+  "신체활동실(1층)": "tone-activity",
   "AI캠퍼스(2층)": "tone-ai",
   "음악실(2층)": "tone-music",
   "다모임실(2층)": "tone-meeting",
-  "신체활동실(1층)": "tone-activity",
-  "체육관(3층)": "tone-gym"
+  "체육관(3층)": "tone-gym",
+  "컴퓨터실(4층)": "tone-computer",
+  "청계누리(강당)": "tone-hall"
 };
 
 export const WEEKDAY_LABELS = ["월", "화", "수", "목", "금"];
