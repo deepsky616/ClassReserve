@@ -532,6 +532,29 @@ form {
   font-size: 18px;
 }
 
+.collapsible-panel-header {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.collapsible-panel-header .ghost-button {
+  flex: 0 0 auto;
+}
+
+.panel-summary {
+  color: var(--subtle);
+  font-size: 13px;
+  font-weight: 800;
+  margin: 6px 0 0;
+}
+
+.collapsible-panel-body {
+  display: grid;
+  gap: 14px;
+}
+
 .duplicate-summary {
   background: var(--panel);
   border: 1px solid var(--line);

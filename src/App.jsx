@@ -33,6 +33,11 @@ import {
   getWeekdayFromDateKey,
   getWeekdayLabel
 } from "./fixedSchedules.js";
+import {
+  FIXED_SCHEDULE_PANEL_DEFAULT_OPEN,
+  getFixedSchedulePanelButtonLabel,
+  getFixedSchedulePanelSummary
+} from "./fixedSchedulePanel.js";
 
 const initialForm = {
   date: toDateKey(new Date()),
@@ -106,6 +111,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingFixedSchedule, setSavingFixedSchedule] = useState(false);
+  const [isFixedSchedulePanelOpen, setIsFixedSchedulePanelOpen] = useState(FIXED_SCHEDULE_PANEL_DEFAULT_OPEN);
   const [cleaningDuplicates, setCleaningDuplicates] = useState(false);
   const [deletingSelected, setDeletingSelected] = useState(false);
   const [selectedReservationIds, setSelectedReservationIds] = useState(() => new Set());
@@ -798,89 +804,104 @@ export default function App() {
               </button>
             </section>
 
-            <section className="admin-panel" aria-label="고정 사용 관리">
-              <div>
-                <p className="eyebrow">고정 사용</p>
-                <h2>고정 사용 등록</h2>
-              </div>
-
-              <form onSubmit={handleFixedScheduleSubmit}>
-                <label>
-                  요일
-                  <select value={fixedForm.weekday} onChange={(event) => updateFixedForm("weekday", event.target.value)}>
-                    {WEEKDAY_OPTIONS.map((weekday) => (
-                      <option key={weekday.value} value={weekday.value}>
-                        {weekday.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <div className="form-row">
-                  <label>
-                    시작 교시
-                    <select value={fixedForm.startPeriod} onChange={(event) => updateFixedForm("startPeriod", event.target.value)}>
-                      {PERIODS.map((period) => (
-                        <option key={period} value={period}>
-                          {period}교시
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label>
-                    끝 교시
-                    <select value={fixedForm.endPeriod} onChange={(event) => updateFixedForm("endPeriod", event.target.value)}>
-                      {PERIODS.filter((period) => period >= Number(fixedForm.startPeriod)).map((period) => (
-                        <option key={period} value={period}>
-                          {period}교시
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+            <section className={`admin-panel collapsible-panel ${isFixedSchedulePanelOpen ? "is-open" : ""}`} aria-label="고정 사용 관리">
+              <div className="collapsible-panel-header">
+                <div>
+                  <p className="eyebrow">고정 사용</p>
+                  <h2>고정 사용 설정</h2>
+                  <p className="panel-summary">{getFixedSchedulePanelSummary(fixedSchedules.length)}</p>
                 </div>
-
-                <label>
-                  특별실
-                  <select value={fixedForm.room} onChange={(event) => updateFixedForm("room", event.target.value)}>
-                    {renderRoomOptions()}
-                  </select>
-                </label>
-
-                <label>
-                  사용 이름
-                  <input
-                    type="text"
-                    value={fixedForm.label}
-                    onChange={(event) => updateFixedForm("label", event.target.value)}
-                    placeholder="예: 3학년 음악"
-                    required
-                  />
-                </label>
-
-                <label>
-                  관리자 비밀번호
-                  <input
-                    type="password"
-                    value={fixedForm.password}
-                    onChange={(event) => updateFixedForm("password", event.target.value)}
-                    minLength={2}
-                    required
-                  />
-                </label>
-
-                <button type="submit" className="primary-button" disabled={savingFixedSchedule}>
-                  {savingFixedSchedule ? "등록 중" : "고정 사용 등록"}
+                <button
+                  type="button"
+                  className="ghost-button compact"
+                  aria-expanded={isFixedSchedulePanelOpen}
+                  onClick={() => setIsFixedSchedulePanelOpen((isOpen) => !isOpen)}
+                >
+                  {getFixedSchedulePanelButtonLabel(isFixedSchedulePanelOpen)}
                 </button>
-              </form>
-
-              <div className="fixed-schedule-list" aria-label="등록된 고정 사용">
-                {fixedSchedules.length === 0 ? (
-                  <p className="duplicate-summary">등록된 고정 사용 없음</p>
-                ) : (
-                  fixedSchedules.map((fixedSchedule) => renderFixedScheduleItem(fixedSchedule, { showWeekday: true }))
-                )}
               </div>
+
+              {isFixedSchedulePanelOpen ? (
+                <div className="collapsible-panel-body">
+                  <form onSubmit={handleFixedScheduleSubmit}>
+                    <label>
+                      요일
+                      <select value={fixedForm.weekday} onChange={(event) => updateFixedForm("weekday", event.target.value)}>
+                        {WEEKDAY_OPTIONS.map((weekday) => (
+                          <option key={weekday.value} value={weekday.value}>
+                            {weekday.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <div className="form-row">
+                      <label>
+                        시작 교시
+                        <select value={fixedForm.startPeriod} onChange={(event) => updateFixedForm("startPeriod", event.target.value)}>
+                          {PERIODS.map((period) => (
+                            <option key={period} value={period}>
+                              {period}교시
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+
+                      <label>
+                        끝 교시
+                        <select value={fixedForm.endPeriod} onChange={(event) => updateFixedForm("endPeriod", event.target.value)}>
+                          {PERIODS.filter((period) => period >= Number(fixedForm.startPeriod)).map((period) => (
+                            <option key={period} value={period}>
+                              {period}교시
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+
+                    <label>
+                      특별실
+                      <select value={fixedForm.room} onChange={(event) => updateFixedForm("room", event.target.value)}>
+                        {renderRoomOptions()}
+                      </select>
+                    </label>
+
+                    <label>
+                      사용 이름
+                      <input
+                        type="text"
+                        value={fixedForm.label}
+                        onChange={(event) => updateFixedForm("label", event.target.value)}
+                        placeholder="예: 3학년 음악"
+                        required
+                      />
+                    </label>
+
+                    <label>
+                      관리자 비밀번호
+                      <input
+                        type="password"
+                        value={fixedForm.password}
+                        onChange={(event) => updateFixedForm("password", event.target.value)}
+                        minLength={2}
+                        required
+                      />
+                    </label>
+
+                    <button type="submit" className="primary-button" disabled={savingFixedSchedule}>
+                      {savingFixedSchedule ? "등록 중" : "고정 사용 등록"}
+                    </button>
+                  </form>
+
+                  <div className="fixed-schedule-list" aria-label="등록된 고정 사용">
+                    {fixedSchedules.length === 0 ? (
+                      <p className="duplicate-summary">등록된 고정 사용 없음</p>
+                    ) : (
+                      fixedSchedules.map((fixedSchedule) => renderFixedScheduleItem(fixedSchedule, { showWeekday: true }))
+                    )}
+                  </div>
+                </div>
+              ) : null}
             </section>
           </aside>
         </div>
