@@ -26,8 +26,11 @@ export function createReservationApp({ store }) {
 
   app.post("/api/reservations", async (request, response, next) => {
     try {
-      const reservation = await store.createReservation(request.body);
-      response.status(201).json({ reservation });
+      const result = await store.createReservationsAndList([request.body]);
+      response.status(201).json({
+        reservation: result.createdReservations[0],
+        reservations: result.reservations
+      });
     } catch (error) {
       next(error);
     }
@@ -35,8 +38,8 @@ export function createReservationApp({ store }) {
 
   app.post("/api/reservations/batch", async (request, response, next) => {
     try {
-      const reservations = await store.createReservations(request.body?.reservations);
-      response.status(201).json({ reservations });
+      const result = await store.createReservationsAndList(request.body?.reservations);
+      response.status(201).json(result);
     } catch (error) {
       next(error);
     }
@@ -44,8 +47,8 @@ export function createReservationApp({ store }) {
 
   app.post("/api/fixed-schedules/batch", async (request, response, next) => {
     try {
-      const fixedSchedules = await store.createFixedSchedules(request.body?.schedules);
-      response.status(201).json({ fixedSchedules });
+      const result = await store.createFixedSchedulesAndList(request.body?.schedules);
+      response.status(201).json(result);
     } catch (error) {
       next(error);
     }
@@ -53,7 +56,7 @@ export function createReservationApp({ store }) {
 
   app.post("/api/fixed-schedules/batch-delete", async (request, response, next) => {
     try {
-      const result = await store.deleteFixedSchedules(request.body?.ids, request.body?.password);
+      const result = await store.deleteFixedSchedulesAndList(request.body?.ids, request.body?.password);
       response.json(result);
     } catch (error) {
       next(error);
@@ -62,7 +65,7 @@ export function createReservationApp({ store }) {
 
   app.delete("/api/reservations/:id", async (request, response, next) => {
     try {
-      const result = await store.deleteReservation(request.params.id, request.body?.password);
+      const result = await store.deleteReservationsAndList([request.params.id], request.body?.password);
       response.json(result);
     } catch (error) {
       next(error);
@@ -71,7 +74,7 @@ export function createReservationApp({ store }) {
 
   app.delete("/api/fixed-schedules/:id", async (request, response, next) => {
     try {
-      const result = await store.deleteFixedSchedule(request.params.id, request.body?.password);
+      const result = await store.deleteFixedSchedulesAndList([request.params.id], request.body?.password);
       response.json(result);
     } catch (error) {
       next(error);

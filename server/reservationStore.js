@@ -84,6 +84,11 @@ export function createReservationStore(options = {}) {
   }
 
   async function createReservations(inputs) {
+    const result = await createReservationsAndList(inputs);
+    return result.createdReservations;
+  }
+
+  async function createReservationsAndList(inputs) {
     if (!Array.isArray(inputs) || inputs.length === 0) {
       throw createError("예약 내용이 없습니다.", "VALIDATION_ERROR", 400);
     }
@@ -139,10 +144,18 @@ export function createReservationStore(options = {}) {
     }
 
     await writeReservations([...reservations, ...createdReservations]);
-    return createdReservations.map(stripPrivateFields);
+    return {
+      createdReservations: createdReservations.map(stripPrivateFields),
+      reservations: [...reservations, ...createdReservations].map(stripPrivateFields)
+    };
   }
 
   async function createFixedSchedules(inputs) {
+    const result = await createFixedSchedulesAndList(inputs);
+    return result.createdFixedSchedules;
+  }
+
+  async function createFixedSchedulesAndList(inputs) {
     if (!Array.isArray(inputs) || inputs.length === 0) {
       throw createError("고정 사용 내용이 없습니다.", "VALIDATION_ERROR", 400);
     }
@@ -174,27 +187,57 @@ export function createReservationStore(options = {}) {
     }
 
     await writeFixedSchedules([...fixedSchedules, ...createdFixedSchedules]);
-    return createdFixedSchedules.map(stripFixedScheduleFields);
+    return {
+      createdFixedSchedules: createdFixedSchedules.map(stripFixedScheduleFields),
+      fixedSchedules: [...fixedSchedules, ...createdFixedSchedules].map(stripFixedScheduleFields).sort(sortFixedSchedules)
+    };
   }
 
   async function deleteReservation(reservationId, password) {
-    if (!reservationId || !password) {
+    const result = await deleteReservations([reservationId], password);
+    return { deleted: result.deletedCount === 1 };
+  }
+
+  async function deleteReservations(reservationIds, password) {
+    const result = await deleteReservationsAndList(reservationIds, password);
+    return {
+      deleted: true,
+      deletedCount: result.deletedCount
+    };
+  }
+
+  async function deleteReservationsAndList(reservationIds, password) {
+    if (!Array.isArray(reservationIds) || reservationIds.length === 0 || !password) {
+      throw createError("예약과 비밀번호를 확인해 주세요.", "VALIDATION_ERROR", 400);
+    }
+
+    const targetIds = [...new Set(reservationIds.map((reservationId) => String(reservationId)).filter(Boolean))];
+
+    if (targetIds.length === 0) {
       throw createError("예약과 비밀번호를 확인해 주세요.", "VALIDATION_ERROR", 400);
     }
 
     const reservations = await readReservations();
-    const reservation = reservations.find((item) => item.id === reservationId);
+    const reservationsById = new Map(reservations.map((reservation) => [reservation.id, reservation]));
+    const targetReservations = targetIds.map((targetId) => reservationsById.get(targetId));
 
-    if (!reservation) {
+    if (targetReservations.some((reservation) => !reservation)) {
       throw createError("예약을 찾을 수 없습니다.", "NOT_FOUND", 404);
     }
 
-    if (!verifyPassword(password, reservation.passwordHash) && password !== adminPassword) {
+    if (targetReservations.some((reservation) => !verifyPassword(password, reservation.passwordHash) && password !== adminPassword)) {
       throw createError("삭제 비밀번호가 맞지 않습니다.", "INVALID_PASSWORD", 403);
     }
 
-    await writeReservations(reservations.filter((item) => item.id !== reservationId));
-    return { deleted: true };
+    const targetIdSet = new Set(targetIds);
+    const nextReservations = reservations.filter((item) => !targetIdSet.has(item.id));
+    await writeReservations(nextReservations);
+
+    return {
+      deleted: true,
+      deletedCount: targetIds.length,
+      reservations: nextReservations.map(stripPrivateFields)
+    };
   }
 
   async function deleteFixedSchedule(fixedScheduleId, password) {
@@ -203,6 +246,14 @@ export function createReservationStore(options = {}) {
   }
 
   async function deleteFixedSchedules(fixedScheduleIds, password) {
+    const result = await deleteFixedSchedulesAndList(fixedScheduleIds, password);
+    return {
+      deleted: true,
+      deletedCount: result.deletedCount
+    };
+  }
+
+  async function deleteFixedSchedulesAndList(fixedScheduleIds, password) {
     verifyAdminPassword(password, adminPassword);
 
     if (!Array.isArray(fixedScheduleIds) || fixedScheduleIds.length === 0) {
@@ -224,11 +275,13 @@ export function createReservationStore(options = {}) {
     }
 
     const targetIdSet = new Set(targetIds);
-    await writeFixedSchedules(fixedSchedules.filter((item) => !targetIdSet.has(item.id)));
+    const nextFixedSchedules = fixedSchedules.filter((item) => !targetIdSet.has(item.id));
+    await writeFixedSchedules(nextFixedSchedules);
 
     return {
       deleted: true,
-      deletedCount: targetIds.length
+      deletedCount: targetIds.length,
+      fixedSchedules: nextFixedSchedules.map(stripFixedScheduleFields).sort(sortFixedSchedules)
     };
   }
 
@@ -237,10 +290,15 @@ export function createReservationStore(options = {}) {
     listFixedSchedules,
     createReservation,
     createReservations,
+    createReservationsAndList,
     createFixedSchedules,
+    createFixedSchedulesAndList,
     deleteReservation,
+    deleteReservations,
+    deleteReservationsAndList,
     deleteFixedSchedule,
-    deleteFixedSchedules
+    deleteFixedSchedules,
+    deleteFixedSchedulesAndList
   };
 }
 

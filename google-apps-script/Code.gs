@@ -121,26 +121,30 @@ function createReservation(input) {
 }
 
 function createManyAndList(inputs) {
-  const createdReservations = createReservations(inputs);
+  const result = createReservationsWithList(inputs);
 
   return {
     ok: true,
-    createdReservations: createdReservations,
-    reservations: listReservations()
+    createdReservations: result.createdReservations,
+    reservations: result.reservations
   };
 }
 
 function createFixedSchedulesAndList(inputs) {
-  const createdFixedSchedules = createFixedSchedules(inputs);
+  const result = createFixedSchedulesWithList(inputs);
 
   return {
     ok: true,
-    createdFixedSchedules: createdFixedSchedules,
-    fixedSchedules: listFixedSchedules()
+    createdFixedSchedules: result.createdFixedSchedules,
+    fixedSchedules: result.fixedSchedules
   };
 }
 
 function createReservations(inputs) {
+  return createReservationsWithList(inputs).createdReservations;
+}
+
+function createReservationsWithList(inputs) {
   if (!Array.isArray(inputs) || inputs.length === 0) {
     throw createError("예약 내용이 없습니다.", "VALIDATION_ERROR");
   }
@@ -190,13 +194,22 @@ function createReservations(inputs) {
         });
       }));
 
-    return createdReservations.map(toPublicReservation);
+    const createdPublicReservations = createdReservations.map(toPublicReservation);
+
+    return {
+      createdReservations: createdPublicReservations,
+      reservations: rows.map(toPublicReservation).concat(createdPublicReservations)
+    };
   } finally {
     lock.releaseLock();
   }
 }
 
 function createFixedSchedules(inputs) {
+  return createFixedSchedulesWithList(inputs).createdFixedSchedules;
+}
+
+function createFixedSchedulesWithList(inputs) {
   if (!Array.isArray(inputs) || inputs.length === 0) {
     throw createError("고정 사용 내용이 없습니다.", "VALIDATION_ERROR");
   }
@@ -239,7 +252,12 @@ function createFixedSchedules(inputs) {
         });
       }));
 
-    return createdFixedSchedules.map(toPublicFixedSchedule);
+    const createdPublicFixedSchedules = createdFixedSchedules.map(toPublicFixedSchedule);
+
+    return {
+      createdFixedSchedules: createdPublicFixedSchedules,
+      fixedSchedules: rows.map(toPublicFixedSchedule).concat(createdPublicFixedSchedules).sort(sortFixedSchedules)
+    };
   } finally {
     lock.releaseLock();
   }
@@ -250,17 +268,25 @@ function deleteReservation(id, password) {
 }
 
 function deleteManyAndList(ids, password) {
-  const result = deleteReservations(ids, password);
+  const result = deleteReservationsWithList(ids, password);
 
   return {
     ok: true,
     deleted: true,
     deletedCount: result.deletedCount,
-    reservations: listReservations()
+    reservations: result.reservations
   };
 }
 
 function deleteReservations(ids, password) {
+  const result = deleteReservationsWithList(ids, password);
+
+  return {
+    deletedCount: result.deletedCount
+  };
+}
+
+function deleteReservationsWithList(ids, password) {
   if (!Array.isArray(ids) || ids.length === 0 || !password) {
     throw createError("예약과 비밀번호를 확인해 주세요.", "VALIDATION_ERROR");
   }
@@ -284,21 +310,27 @@ function deleteReservations(ids, password) {
     const sheet = getReservationSheet();
     const values = sheet.getDataRange().getValues();
     const rowsToDelete = [];
+    const reservations = [];
+    const reservationsById = {};
+
+    for (let rowIndex = 1; rowIndex < values.length; rowIndex += 1) {
+      const row = values[rowIndex];
+
+      if (!row[0]) {
+        continue;
+      }
+
+      const reservation = rowToReservation(row);
+      reservations.push(reservation);
+      reservationsById[reservation.id] = {
+        rowNumber: rowIndex + 1,
+        reservation: reservation
+      };
+    }
 
     targetIds.forEach(function (id) {
-      let matchedRowNumber = null;
-      let matchedReservation = null;
-
-      for (let rowIndex = 1; rowIndex < values.length; rowIndex += 1) {
-        const row = values[rowIndex];
-        const reservation = rowToReservation(row);
-
-        if (reservation.id === id) {
-          matchedRowNumber = rowIndex + 1;
-          matchedReservation = reservation;
-          break;
-        }
-      }
+      const matched = reservationsById[id];
+      const matchedReservation = matched ? matched.reservation : null;
 
       if (!matchedReservation) {
         throw createError("예약을 찾을 수 없습니다.", "NOT_FOUND");
@@ -308,17 +340,21 @@ function deleteReservations(ids, password) {
         throw createError("삭제 비밀번호가 맞지 않습니다.", "INVALID_PASSWORD");
       }
 
-      rowsToDelete.push(matchedRowNumber);
+      rowsToDelete.push(matched.rowNumber);
     });
 
-    rowsToDelete.sort(function (left, right) {
-      return right - left;
-    }).forEach(function (rowNumber) {
-      sheet.deleteRow(rowNumber);
+    deleteSheetRows(sheet, rowsToDelete);
+
+    const targetIdMap = {};
+    targetIds.forEach(function (id) {
+      targetIdMap[id] = true;
     });
 
     return {
-      deletedCount: rowsToDelete.length
+      deletedCount: rowsToDelete.length,
+      reservations: reservations.filter(function (reservation) {
+        return !targetIdMap[reservation.id];
+      }).map(toPublicReservation)
     };
   } finally {
     lock.releaseLock();
@@ -326,17 +362,25 @@ function deleteReservations(ids, password) {
 }
 
 function deleteFixedSchedulesAndList(ids, password) {
-  const result = deleteFixedSchedules(ids, password);
+  const result = deleteFixedSchedulesWithList(ids, password);
 
   return {
     ok: true,
     deleted: true,
     deletedCount: result.deletedCount,
-    fixedSchedules: listFixedSchedules()
+    fixedSchedules: result.fixedSchedules
   };
 }
 
 function deleteFixedSchedules(ids, password) {
+  const result = deleteFixedSchedulesWithList(ids, password);
+
+  return {
+    deletedCount: result.deletedCount
+  };
+}
+
+function deleteFixedSchedulesWithList(ids, password) {
   verifyAdminPassword(password);
 
   if (!Array.isArray(ids) || ids.length === 0) {
@@ -362,34 +406,46 @@ function deleteFixedSchedules(ids, password) {
     const sheet = getFixedScheduleSheet();
     const values = sheet.getDataRange().getValues();
     const rowsToDelete = [];
+    const fixedSchedules = [];
+    const fixedSchedulesById = {};
 
-    targetIds.forEach(function (id) {
-      let matchedRowNumber = null;
+    for (let rowIndex = 1; rowIndex < values.length; rowIndex += 1) {
+      const row = values[rowIndex];
 
-      for (let rowIndex = 1; rowIndex < values.length; rowIndex += 1) {
-        const fixedSchedule = rowToFixedSchedule(values[rowIndex]);
-
-        if (fixedSchedule.id === id) {
-          matchedRowNumber = rowIndex + 1;
-          break;
-        }
+      if (!row[0]) {
+        continue;
       }
 
-      if (!matchedRowNumber) {
+      const fixedSchedule = rowToFixedSchedule(row);
+      fixedSchedules.push(fixedSchedule);
+      fixedSchedulesById[fixedSchedule.id] = {
+        rowNumber: rowIndex + 1,
+        fixedSchedule: fixedSchedule
+      };
+    }
+
+    targetIds.forEach(function (id) {
+      const matched = fixedSchedulesById[id];
+
+      if (!matched) {
         throw createError("고정 사용을 찾을 수 없습니다.", "NOT_FOUND");
       }
 
-      rowsToDelete.push(matchedRowNumber);
+      rowsToDelete.push(matched.rowNumber);
     });
 
-    rowsToDelete.sort(function (left, right) {
-      return right - left;
-    }).forEach(function (rowNumber) {
-      sheet.deleteRow(rowNumber);
+    deleteSheetRows(sheet, rowsToDelete);
+
+    const targetIdMap = {};
+    targetIds.forEach(function (id) {
+      targetIdMap[id] = true;
     });
 
     return {
-      deletedCount: rowsToDelete.length
+      deletedCount: rowsToDelete.length,
+      fixedSchedules: fixedSchedules.filter(function (fixedSchedule) {
+        return !targetIdMap[fixedSchedule.id];
+      }).map(toPublicFixedSchedule).sort(sortFixedSchedules)
     };
   } finally {
     lock.releaseLock();
@@ -484,6 +540,35 @@ function readFixedScheduleRows(sheet) {
       return row[0];
     })
     .map(rowToFixedSchedule);
+}
+
+function deleteSheetRows(sheet, rowNumbers) {
+  const sortedRows = rowNumbers.slice().sort(function (left, right) {
+    return right - left;
+  });
+  let groupStart = null;
+  let groupEnd = null;
+
+  sortedRows.forEach(function (rowNumber) {
+    if (groupStart === null) {
+      groupStart = rowNumber;
+      groupEnd = rowNumber;
+      return;
+    }
+
+    if (rowNumber === groupEnd - 1) {
+      groupEnd = rowNumber;
+      return;
+    }
+
+    sheet.deleteRows(groupEnd, groupStart - groupEnd + 1);
+    groupStart = rowNumber;
+    groupEnd = rowNumber;
+  });
+
+  if (groupStart !== null) {
+    sheet.deleteRows(groupEnd, groupStart - groupEnd + 1);
+  }
 }
 
 function rowToReservation(row) {

@@ -109,6 +109,7 @@ npm run dev
 - 앱스 스크립트 편집기에서 `doGet`을 직접 실행하면 실제 웹 요청 정보가 없어서 정상 테스트가 아닙니다.
 - `Code.gs`를 수정한 뒤에는 새 버전으로 다시 배포해야 실제 웹앱에 반영됩니다.
 - 여러 교시 한 번 예약은 `Code.gs`의 `createManyAndList` 요청을 사용하므로, 이번 버전의 `Code.gs`를 다시 배포해야 동작합니다.
+- 예약 등록, 고정 사용 등록, 예약 삭제, 고정 사용 삭제의 지연 개선은 이번 버전의 `Code.gs`에 포함되어 있으므로, 다시 배포해야 실제 운영 앱에 반영됩니다.
 - 체육관 2건 허용 규칙은 `Code.gs`의 예약 생성 로직에 포함되어 있으므로, 이번 버전의 `Code.gs`를 다시 배포해야 동작합니다.
 - 고정 사용은 `fixed_schedules` 시트와 `listFixedSchedules`, `createFixedSchedulesAndList`, `deleteFixedSchedulesAndList` 요청을 사용하므로, 이번 버전의 `Code.gs`를 다시 배포해야 동작합니다.
 - 선택 삭제는 `deleteManyAndList` 요청을 사용해 여러 예약 삭제와 최신 목록 반환을 한 번에 처리합니다.
