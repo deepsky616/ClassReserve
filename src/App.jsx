@@ -73,6 +73,7 @@ const messageByCode = {
   NOT_FOUND: "예약을 찾을 수 없습니다.",
   CONFIG_MISSING: "구글 앱스 스크립트 주소가 설정되지 않았습니다.",
   GOOGLE_SCRIPT_UNAVAILABLE: "구글 시트 저장소에 연결할 수 없습니다.",
+  GOOGLE_SCRIPT_TIMEOUT: "구글 앱스 스크립트 응답 시간이 초과되었습니다. 잠시 뒤 다시 시도해 주세요.",
   GOOGLE_SCRIPT_ERROR: "구글 시트 저장소 요청을 처리하지 못했습니다.",
   PERSISTENCE_UNCONFIRMED: "예약 저장을 확인하지 못했습니다. 저장소 배포 상태를 확인해 주세요.",
   DELETE_UNCONFIRMED: "예약 삭제를 확인하지 못했습니다. 저장소 배포 상태를 확인해 주세요."
@@ -80,7 +81,14 @@ const messageByCode = {
 
 function errorMessage(error, fallback) {
   if (
-    ["DUPLICATE_RESERVATION", "PERSISTENCE_UNCONFIRMED", "DELETE_UNCONFIRMED"].includes(error.code) &&
+    [
+      "DUPLICATE_RESERVATION",
+      "INVALID_PASSWORD",
+      "GOOGLE_SCRIPT_TIMEOUT",
+      "GOOGLE_SCRIPT_UNAVAILABLE",
+      "PERSISTENCE_UNCONFIRMED",
+      "DELETE_UNCONFIRMED"
+    ].includes(error.code) &&
     error.message
   ) {
     return error.message;

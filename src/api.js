@@ -3,7 +3,7 @@ import { normalizeRoomName } from "./roomUtils.js";
 import { getPeriodRange } from "./periodRange.js";
 import { normalizeFixedSchedule } from "./fixedSchedules.js";
 
-const DEFAULT_TIMEOUT_MS = 15000;
+const DEFAULT_TIMEOUT_MS = 30000;
 
 function getConfiguredScriptUrl(options = {}) {
   return options.scriptUrl ?? import.meta.env?.VITE_GOOGLE_SCRIPT_URL ?? "";
@@ -28,7 +28,10 @@ function callGoogleScript(payload, options = {}) {
     const script = document.createElement("script");
     const timeout = window.setTimeout(() => {
       cleanup();
-      reject(createClientError("구글 앱스 스크립트 응답 시간이 초과되었습니다.", "GOOGLE_SCRIPT_UNAVAILABLE"));
+      reject(createClientError(
+        "구글 앱스 스크립트 응답 시간이 초과되었습니다. 잠시 뒤 다시 시도해 주세요.",
+        "GOOGLE_SCRIPT_TIMEOUT"
+      ));
     }, options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
 
     window[callbackName] = (body) => {
