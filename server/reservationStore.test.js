@@ -59,14 +59,14 @@ test("같은 날짜와 교시와 특별실은 중복 예약할 수 없다", asyn
   });
 });
 
-test("체육관은 같은 날짜와 교시에 두 번째 예약까지 저장할 수 있다", async () => {
+test("청계누리는 같은 날짜와 교시에 두 번째 예약까지 저장할 수 있다", async () => {
   await withStore(async (store) => {
     await store.createReservation({ ...validInput, room: "체육관" });
-    await store.createReservation({ ...validInput, room: "체육관", grade: 5, classNumber: 1 });
+    await store.createReservation({ ...validInput, room: "청계누리(강당)", grade: 5, classNumber: 1 });
 
     const reservations = await store.listReservations();
     assert.equal(reservations.length, 2);
-    assert.deepEqual(reservations.map((reservation) => reservation.room), ["체육관", "체육관"]);
+    assert.deepEqual(reservations.map((reservation) => reservation.room), ["청계누리(강당)", "청계누리(강당)"]);
   }, {
     id: (() => {
       let nextId = 1;
@@ -75,13 +75,13 @@ test("체육관은 같은 날짜와 교시에 두 번째 예약까지 저장할 
   });
 });
 
-test("체육관은 같은 날짜와 교시에 세 번째 예약부터 거부한다", async () => {
+test("청계누리는 같은 날짜와 교시에 세 번째 예약부터 거부한다", async () => {
   await withStore(async (store) => {
     await store.createReservation({ ...validInput, room: "체육관" });
-    await store.createReservation({ ...validInput, room: "체육관", grade: 5, classNumber: 1 });
+    await store.createReservation({ ...validInput, room: "청계누리(강당)", grade: 5, classNumber: 1 });
 
     await assert.rejects(
-      () => store.createReservation({ ...validInput, room: "체육관", grade: 6, classNumber: 1 }),
+      () => store.createReservation({ ...validInput, room: "청계누리(강당)", grade: 6, classNumber: 1 }),
       {
         code: "DUPLICATE_RESERVATION",
         message: "이미 3학년 4반 외 1건이 먼저 예약해서 예약할 수 없습니다."
@@ -261,16 +261,21 @@ test("목록에 없는 특별실은 예약할 수 없다", async () => {
   });
 });
 
-test("삭제된 청계누리는 예약할 수 없다", async () => {
+test("청계누리와 새 특별실은 예약할 수 있다", async () => {
   await withStore(async (store) => {
-    await assert.rejects(
-      () => store.createReservation({ ...validInput, room: "청계누리(강당)" }),
-      { code: "VALIDATION_ERROR" }
-    );
+    const auditorium = await store.createReservation({ ...validInput, room: "청계누리(강당)" });
+    const club1 = await store.createReservation({ ...validInput, date: "2026-06-16", room: "동아리1" });
+    const club2 = await store.createReservation({ ...validInput, date: "2026-06-17", room: "동아리2" });
+    const multipurpose = await store.createReservation({ ...validInput, date: "2026-06-18", room: "다목적실" });
+
+    assert.equal(auditorium.room, "청계누리(강당)");
+    assert.equal(club1.room, "동아리1");
+    assert.equal(club2.room, "동아리2");
+    assert.equal(multipurpose.room, "다목적실");
   });
 });
 
-test("층수 없는 특별실 목록의 컴퓨터실과 AI캠퍼스와 신체활동실과 체육관을 예약할 수 있다", async () => {
+test("층수 없는 특별실 목록의 컴퓨터실과 AI캠퍼스와 신체활동실과 청계누리를 예약할 수 있다", async () => {
   await withStore(async (store) => {
     const computerRoom = await store.createReservation({
       ...validInput,
@@ -289,13 +294,13 @@ test("층수 없는 특별실 목록의 컴퓨터실과 AI캠퍼스와 신체활
     const gym = await store.createReservation({
       ...validInput,
       date: "2026-06-18",
-      room: "체육관"
+      room: "청계누리(강당)"
     });
 
     assert.equal(computerRoom.room, "컴퓨터실");
     assert.equal(aiRoom.room, "AI캠퍼스");
     assert.equal(activityRoom.room, "신체활동실");
-    assert.equal(gym.room, "체육관");
+    assert.equal(gym.room, "청계누리(강당)");
   });
 });
 
@@ -307,13 +312,15 @@ test("이전 층수 이름은 층수 없는 이름으로 저장된다", async ()
     const ai = await store.createReservation({ ...validInput, date: "2026-06-18", room: "AI실(2층)" });
     const gym = await store.createReservation({ ...validInput, date: "2026-06-19", room: "체육관(3층)" });
     const computer = await store.createReservation({ ...validInput, date: "2026-06-20", room: "컴퓨터실(4층)" });
+    const music5 = await store.createReservation({ ...validInput, date: "2026-06-21", room: "음악실(5층)" });
 
     assert.equal(play.room, "창의놀이실");
     assert.equal(music.room, "음악실");
     assert.equal(meeting.room, "다모임실");
     assert.equal(ai.room, "AI캠퍼스");
-    assert.equal(gym.room, "체육관");
+    assert.equal(gym.room, "청계누리(강당)");
     assert.equal(computer.room, "컴퓨터실");
+    assert.equal(music5.room, "음악실");
   }, {
     id: (() => {
       let nextId = 1;

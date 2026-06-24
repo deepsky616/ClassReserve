@@ -63,7 +63,7 @@ test("특별실이 다르면 중복 정리 대상이 아니다", () => {
   assert.deepEqual(getDuplicateReservationGroups(reservations), []);
 });
 
-test("체육관은 같은 시간 두 건까지 중복 정리 대상이 아니다", () => {
+test("청계누리는 같은 시간 두 건까지 중복 정리 대상이 아니다", () => {
   const reservations = [
     {
       ...baseReservation,
@@ -74,7 +74,7 @@ test("체육관은 같은 시간 두 건까지 중복 정리 대상이 아니다
     {
       ...baseReservation,
       id: "gym-second",
-      room: "체육관",
+      room: "청계누리(강당)",
       grade: 2,
       classNumber: 1,
       createdAt: "2026-06-10T09:02:00.000Z"
@@ -84,7 +84,7 @@ test("체육관은 같은 시간 두 건까지 중복 정리 대상이 아니다
   assert.deepEqual(getDuplicateReservationGroups(reservations), []);
 });
 
-test("체육관은 같은 시간 세 번째 예약부터 중복 정리 대상이다", () => {
+test("청계누리는 같은 시간 세 번째 예약부터 중복 정리 대상이다", () => {
   const reservations = [
     {
       ...baseReservation,
@@ -95,7 +95,7 @@ test("체육관은 같은 시간 세 번째 예약부터 중복 정리 대상이
     {
       ...baseReservation,
       id: "gym-second",
-      room: "체육관",
+      room: "청계누리(강당)",
       grade: 2,
       classNumber: 1,
       createdAt: "2026-06-10T09:02:00.000Z"
@@ -103,7 +103,7 @@ test("체육관은 같은 시간 세 번째 예약부터 중복 정리 대상이
     {
       ...baseReservation,
       id: "gym-third",
-      room: "체육관",
+      room: "청계누리(강당)",
       grade: 3,
       classNumber: 1,
       createdAt: "2026-06-10T09:03:00.000Z"
