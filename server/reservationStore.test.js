@@ -275,6 +275,21 @@ test("청계누리와 새 특별실은 예약할 수 있다", async () => {
   });
 });
 
+test("2층 음악실과 5층 음악실은 같은 교시에도 따로 예약할 수 있다", async () => {
+  await withStore(async (store) => {
+    await store.createReservation({ ...validInput, room: "음악실(2층)" });
+    await store.createReservation({ ...validInput, room: "음악실", grade: 5, classNumber: 1 });
+
+    const reservations = await store.listReservations();
+    assert.deepEqual(reservations.map((reservation) => reservation.room), ["음악실(2층)", "음악실"]);
+  }, {
+    id: (() => {
+      let nextId = 1;
+      return () => `music-room-${nextId++}`;
+    })()
+  });
+});
+
 test("층수 없는 특별실 목록의 컴퓨터실과 AI캠퍼스와 신체활동실과 청계누리를 예약할 수 있다", async () => {
   await withStore(async (store) => {
     const computerRoom = await store.createReservation({
