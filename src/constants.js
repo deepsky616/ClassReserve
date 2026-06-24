@@ -22,10 +22,11 @@ export const ROOM_TONE_CLASSES = {
   "창의놀이실(1층)": "tone-play",
   "청계누리(강당)": "tone-hall",
   "컴퓨터실(4층)": "tone-computer",
-  "AI실(2층)": "tone-ai",
-  "음악실": "tone-music",
-  "다모임실": "tone-meeting",
-  "신체활동실(1층)": "tone-activity"
+  "AI캠퍼스(2층)": "tone-ai",
+  "음악실(2층)": "tone-music",
+  "다모임실(2층)": "tone-meeting",
+  "신체활동실(1층)": "tone-activity",
+  "체육관(3층)": "tone-gym"
 };
 
 export const WEEKDAY_LABELS = ["월", "화", "수", "목", "금"];

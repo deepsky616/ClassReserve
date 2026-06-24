@@ -374,6 +374,11 @@ button:focus-visible {
   background: #cffafe;
 }
 
+.reservation-item.tone-gym {
+  border-left-color: #475569;
+  background: #e2e8f0;
+}
+
 .reservation-item strong,
 .reservation-item span {
   display: block;
