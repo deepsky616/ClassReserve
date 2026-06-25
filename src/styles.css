@@ -369,6 +369,12 @@ button:focus-visible {
   background: #fce7f3;
 }
 
+.reservation-item.tone-music-secondary,
+.fixed-schedule-item.tone-music-secondary {
+  border-left-color: #9333ea;
+  background: #f3e8ff;
+}
+
 .reservation-item.tone-meeting,
 .fixed-schedule-item.tone-meeting {
   border-left-color: #4d7c0f;

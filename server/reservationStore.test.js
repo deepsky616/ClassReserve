@@ -319,7 +319,7 @@ test("층수 없는 특별실 목록의 컴퓨터실과 AI캠퍼스와 신체활
   });
 });
 
-test("이전 층수 이름은 층수 없는 이름으로 저장된다", async () => {
+test("이전 층수 이름은 예약 가능한 최신 이름으로 저장된다", async () => {
   await withStore(async (store) => {
     const play = await store.createReservation({ ...validInput, room: "창의놀이실(1층)" });
     const music = await store.createReservation({ ...validInput, date: "2026-06-16", room: "음악실(2층)" });
@@ -330,7 +330,7 @@ test("이전 층수 이름은 층수 없는 이름으로 저장된다", async ()
     const music5 = await store.createReservation({ ...validInput, date: "2026-06-21", room: "음악실(5층)" });
 
     assert.equal(play.room, "창의놀이실");
-    assert.equal(music.room, "음악실");
+    assert.equal(music.room, "음악실(2층)");
     assert.equal(meeting.room, "다모임실");
     assert.equal(ai.room, "AI캠퍼스");
     assert.equal(gym.room, "청계누리(강당)");

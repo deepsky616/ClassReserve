@@ -2,13 +2,15 @@ const SHEET_NAME = "reservations";
 const FIXED_SCHEDULE_SHEET_NAME = "fixed_schedules";
 const SPREADSHEET_ID_PROPERTY = "SPREADSHEET_ID";
 const ADMIN_DELETE_PASSWORD_PROPERTY = "ADMIN_DELETE_PASSWORD";
-const ALLOWED_ROOMS = ["창의놀이실", "신체활동실", "AI캠퍼스", "다모임실", "청계누리(강당)", "동아리1", "동아리2", "컴퓨터실", "다목적실", "음악실"];
+const ALLOWED_ROOMS = ["창의놀이실", "신체활동실", "AI캠퍼스", "음악실(2층)", "다모임실", "청계누리(강당)", "동아리1", "동아리2", "컴퓨터실", "다목적실", "음악실"];
 const GYM_ROOM = "청계누리(강당)";
 const DEFAULT_ROOM_RESERVATION_LIMIT = 1;
 const GYM_RESERVATION_LIMIT = 2;
 const ROOM_ALIASES = {
   "AI실": "AI캠퍼스",
-  "체육관": "청계누리(강당)"
+  "체육관": "청계누리(강당)",
+  "음악실(2층)": "음악실(2층)",
+  "음악실(5층)": "음악실"
 };
 const KINDERGARTEN_GRADE = "유치원";
 const RESERVATION_WINDOW_DAYS = 56;
@@ -775,8 +777,9 @@ function getWeekdayLabel(weekday) {
 }
 
 function normalizeRoomName(room) {
-  const value = String(room).replace(/\([1-5]층\)/g, "");
-  return ROOM_ALIASES[value] || value;
+  const rawValue = String(room);
+  const value = rawValue.replace(/\([1-5]층\)/g, "");
+  return ROOM_ALIASES[rawValue] || ROOM_ALIASES[value] || value;
 }
 
 function isKindergartenGrade(value) {

@@ -170,7 +170,7 @@ test("JSONP로 고정 사용 목록을 조회한다", async () => {
     assert.equal(fixedSchedules.length, 1);
     assert.equal(fixedSchedules[0].weekday, 1);
     assert.equal(fixedSchedules[0].period, 2);
-    assert.equal(fixedSchedules[0].room, "음악실");
+    assert.equal(fixedSchedules[0].room, "음악실(2층)");
   } finally {
     harness.restore();
   }

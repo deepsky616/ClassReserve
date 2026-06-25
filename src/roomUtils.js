@@ -5,7 +5,7 @@ export const ROOM_GROUPS = [
   },
   {
     label: "2층",
-    rooms: ["AI캠퍼스", "다모임실"]
+    rooms: ["AI캠퍼스", "음악실(2층)", "다모임실"]
   },
   {
     label: "3층",
@@ -25,12 +25,15 @@ export const ROOMS = ROOM_GROUPS.flatMap((group) => group.rooms);
 
 const ROOM_ALIASES = {
   "AI실": "AI캠퍼스",
-  "체육관": "청계누리(강당)"
+  "체육관": "청계누리(강당)",
+  "음악실(2층)": "음악실(2층)",
+  "음악실(5층)": "음악실"
 };
 
 export function normalizeRoomName(room) {
-  const value = String(room).replace(/\([1-5]층\)/g, "");
-  return ROOM_ALIASES[value] ?? value;
+  const rawValue = String(room);
+  const value = rawValue.replace(/\([1-5]층\)/g, "");
+  return ROOM_ALIASES[rawValue] ?? ROOM_ALIASES[value] ?? value;
 }
 
 export function isAllowedRoom(room) {

@@ -22,6 +22,7 @@ export const ROOM_TONE_CLASSES = {
   "창의놀이실": "tone-play",
   "신체활동실": "tone-activity",
   "AI캠퍼스": "tone-ai",
+  "음악실(2층)": "tone-music-secondary",
   "다모임실": "tone-meeting",
   "청계누리(강당)": "tone-gym",
   "동아리1": "tone-club",
